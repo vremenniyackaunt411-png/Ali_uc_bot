@@ -32,7 +32,7 @@ ANSWERS = {
     'salom': 'Воаллейкум салом ❤️',
     'салом': 'Салом! Хуш омадед ❤️',
     'ссалом': 'Салом! Хуш омадед ❤️',
-    'сети': 'МАН ДАР СЕТАМ 24/7 🤯 ',
+    'сети': 'МАН ДАР СЕТАМ 24/7 🤯. \n Барои мухофизати гурух сохта шудаам. ',
     'хуби': 'Хубам, раҳмат! 🤖. Шумо чихел?',
     'sozi': 'Хубам, раҳмат! 🤖. Шумо чихел?',
     'сози': 'Хубам, раҳмат! 🤖. Шумо чихел?',
@@ -56,7 +56,7 @@ ANSWERS = {
 # Калимаҳои манъшуда
 BAD_WORDS = [
     'кунте', 'кунти', 'гандон', 'сука', 'кс',
-    'далбаёб',  'кер', 'гом', 'ks'
+    'далбаёб',  'кер', 'гом', 'ks', 'сина'
 ]
 
 # Функсия барои санҷидани админ будани корбар
@@ -90,15 +90,15 @@ def has_link_or_nickname(message):
 
     return False
 
-# Санҷиши калимаҳои манъшуда
-def has_bad_words(text):
+# Санҷиши калимаҳои манъшуда (акнун худи калимаи ёфтшударо бармегардонад)
+def find_bad_word(text):
     if not text:
-        return False
+        return None
     text = text.lower()
     for word in BAD_WORDS:
         if word in text:
-            return True
-    return False
+            return word  # Калимаи бади ёфтшударо бармегардонад
+    return None
 
 # Функсияи умумӣ барои блок (Restrict) кардани корбар ба вақти муайян
 def restrict_user(chat_id, user_id, seconds):
@@ -119,6 +119,7 @@ def filter_messages(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     user_name = message.from_user.first_name
+    username = f"@{message.from_user.username}" if message.from_user.username else "Никнейм надорад"
 
     # АГАР АДМИН БОШАД - ҲЕҶ ЧИЗРО ТОЗА НАКУН
     if is_admin(message):
@@ -162,35 +163,55 @@ def filter_messages(message):
         return
 
     # 2. Корбарони оддӣ: Системаи 3 огоҳӣ барои калимаҳои бад (Блоки 1 соат)
-    if message.content_type == 'text' and has_bad_words(message.text):
-        try:
-            bot.delete_message(chat_id, message.message_id)
-            
-            if user_id not in user_badword_warnings:
-                user_badword_warnings[user_id] = 0
+    if message.content_type == 'text':
+        detected_bad_word = find_bad_word(message.text)
+        if detected_bad_word:
+            try:
+                # 1. Паёми ҳақоратдорро тоза мекунем
+                bot.delete_message(chat_id, message.message_id)
                 
-            user_badword_warnings[user_id] += 1
-            
-            if user_badword_warnings[user_id] == 1:
-                bot.send_message(
-                    chat_id,
-                    f"⚠️ Корбар {user_name}, \n Дар гурух суханхои кабех ва дашном манъ аст! Огоҳӣ: (1/3)\nАДМИН: @ALI_UC_SHOPP ❤️"
+                # 2. Ба шумо (админ) огоҳиномаи махфӣ мефиристем
+                group_title = message.chat.title if message.chat.title else "Гурӯҳи хусусӣ"
+                report_message = (
+                    f"🚨 **Дашном ошкор шуд!**\n\n"
+                    f"👥 **Гурӯҳ:** {group_title} (ID: `{chat_id}`)\n"
+                    f"👤 **Нависанда:** {user_name} ({username}) (ID: `{user_id}`)\n"
+                    f"🤬 **Калимаи ёфтшуда:** `{detected_bad_word}`\n"
+                    f"📝 **Паёми пурра:**\n_\"{message.text}\"_"
                 )
-            elif user_badword_warnings[user_id] == 2:
-                bot.send_message(
-                    chat_id,
-                    f"⚠️ Корбар {user_name}, \n Бори дуюм аст! Огоҳии охирин барои калимаҳои ноҷо: (2/3)"
-                )
-            elif user_badword_warnings[user_id] >= 3:
-                restrict_user(chat_id, user_id, 3600) # 1 соат блок (3600 сония)
-                bot.send_message(
-                    chat_id,
-                    f"🚫 Корбар {user_name} \n барои истифодаи суханхои кабех ё дашном ба муҳлати 1 соата блок шуд!"
-                )
-                user_badword_warnings[user_id] = 0
-        except Exception as e:
-            print(f"Хатогӣ дар тозакунии калимаҳо: {e}")
-        return
+                
+                # Фиристодани отчёт ба личкаи шумо
+                try:
+                    bot.send_message(ADMIN_ID, report_message, parse_mode="Markdown")
+                except Exception as send_err:
+                    print(f"Хатогӣ ҳангоми фиристодани отчёт ба админ: {send_err}")
+
+                # 3. Додани огоҳӣ ба корбар дар гурӯҳ
+                if user_id not in user_badword_warnings:
+                    user_badword_warnings[user_id] = 0
+                    
+                user_badword_warnings[user_id] += 1
+                
+                if user_badword_warnings[user_id] == 1:
+                    bot.send_message(
+                        chat_id,
+                        f"⚠️ Корбар {user_name}, \n Дар гурух суханхои кабех ва дашном манъ аст! Огоҳӣ: (1/3)\nАДМИН: @ALI_UC_SHOPP ❤️"
+                    )
+                elif user_badword_warnings[user_id] == 2:
+                    bot.send_message(
+                        chat_id,
+                        f"⚠️ Корбар {user_name}, \n Бори дуюм аст! Огоҳии охирин барои калимаҳои ноҷо: (2/3)"
+                    )
+                elif user_badword_warnings[user_id] >= 3:
+                    restrict_user(chat_id, user_id, 3600) # 1 соат блок (3600 сония)
+                    bot.send_message(
+                        chat_id,
+                        f"🚫 Корбар {user_name} \n барои истифодаи суханхои кабех ё дашном ба муҳлати 1 соата блок шуд!"
+                    )
+                    user_badword_warnings[user_id] = 0
+            except Exception as e:
+                print(f"Хатогӣ дар тозакунии калимаҳо: {e}")
+            return
 
     # 3. Ҷавоб додан ба саволҳои оддӣ
     if message.content_type == 'text':
