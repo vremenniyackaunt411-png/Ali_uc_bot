@@ -150,10 +150,19 @@ def filter_messages(message):
 
     # 1. Агар паём аз ҷониби АДМИН бошад:
     if admin_status:
-        # Никнейми ӯ ва вақти паёмро барои ин гурӯҳ сабт мекунем (барои 48 соат)
-        if message.from_user.username:
+        admin_username = None
+        
+        # Агар шумо ҳамчун канал (анонимӣ) навишта бошед ва он канал юзернейм дошта бошад:
+        if message.sender_chat and message.sender_chat.username:
+            admin_username = f"@{message.sender_chat.username}"
+        # Агар аз профили шахсӣ нависед ва никнейми системавии ботҳо набошад:
+        elif message.from_user.username and message.from_user.username not in ["Channel_Bot", "GroupAnonymousBot"]:
+            admin_username = f"@{message.from_user.username}"
+            
+        # Агар никнейми мувофиқ ёфт шуд, онро сабт мекунем
+        if admin_username:
             last_group_admins[chat_id] = {
-                "username": f"@{message.from_user.username}",
+                "username": admin_username,
                 "last_time": time.time()
             }
         
