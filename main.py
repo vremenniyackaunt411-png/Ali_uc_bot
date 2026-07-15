@@ -1,12 +1,12 @@
 import os
 import time
+import random
 from threading import Thread
 from flask import Flask
 import telebot
-import re
 
 TOKEN = '8805476577:AAHlJF4UlB-n4bFRpMqKgj7WKqsXQp-LQqA'
-# ИД-и телеграми худро дар инҷо нависед, то бот шуморо ҳамчун супер-админ шиносад
+# ИД-и телеграми шумо (Супер-Админ)
 ADMIN_ID = 6871575684 
 
 bot = telebot.TeleBot(TOKEN)
@@ -25,33 +25,10 @@ def run_flask():
 
 # Базаи огоҳиҳои корбарон (дар хотира)
 user_link_warnings = {}     # Огоҳиҳо барои ссылка ва никнейм (Блоки 24 соат)
-user_badword_warnings = {}  # Огоҳиҳо барои калимаҳои бад (Блоки 1 соат)
+user_badword_warnings = {}  # Огоҳиҳо барои калимаҳои бад (Блоки 8 соат)
 
-# Ҷавобҳои бот
-ANSWERS = {
-    'salom': 'Воаллейкум салом ❤️',
-    'салом': 'Салом! Хуш омадед ❤️',
-    'ссалом': 'Салом! Хуш омадед ❤️',
-    'сети': 'МАН ДАР СЕТАМ 24/7 🤯. \n Барои мухофизати гурух сохта шудаам. ',
-    'хуби': 'Хубам, раҳмат! 🤖. Шумо чихел?',
-    'sozi': 'Хубам, раҳмат! 🤖. Шумо чихел?',
-    'сози': 'Хубам, раҳмат! 🤖. Шумо чихел?',
-    'юс': 'Барои нарх ба админ @ALI_UC_SHOPP ❤️ муроҷиат кунед.',
-    'uc': 'Барои нарх ба админ @ALI_UC_SHOPP ❤️ муроҷиат кунед.',
-    'админ': 'админ 👉 @ALI_UC_SHOPP ❤️ ',
-    'admin': 'админ 👉 @ALI_UC_SHOPP ❤️ ',
-    'нарх': 'нархо барои юс харидан дар инчо аст 👇 \n https://t.me/ALI_US_SHOPP/6311 ❤️',
-    'narx': 'нархо барои юс харидан дар инчо аст 👇 \n https://t.me/ALI_US_SHOPP/6311 ❤️',
-    'рахмат': 'САЛОМАТ БОШЕН 🤝',
-    'ки мехара': '√1 ГАРАНТ @ALI_UC_SHOPP ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
-    'хариданийм': '√1 ГАРАНТ @ALI_UC_SHOPP ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
-    'фуруши дорм': '√1 ГАРАНТ @ALI_UC_SHOPP ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
-    'мефурушм': '√1 ГАРАНТ @ALI_UC_SHOPP ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
-    'мехарм': '√1 ГАРАНТ @ALI_UC_SHOPP ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
-    'аккаунт': 'аккаунт харидан ё фурухтани бошен лс @ALI_UC_SHOPP ❤️ нависен',
-    'акаунт': 'аккаунт харидан ё фурухтани бошен лс @ALI_UC_SHOPP ❤️ нависен',
-    'бот': 'СаЛоМ. \nМан зехни сунъи хастам ёрдамчии @ALI_UC_SHOPP ❤️'
-}
+# Базаи динамикии админҳо: {chat_id: {"username": "@nick", "last_time": timestamp}}
+last_group_admins = {}
 
 # Калимаҳои манъшуда
 BAD_WORDS = [
@@ -59,12 +36,60 @@ BAD_WORDS = [
     'далбаёб',  'кер', 'гом', 'ks', 'сина'
 ]
 
+# Функсия барои гузоштани реаксия ба паём
+def send_reaction(chat_id, message_id, emoji):
+    try:
+        # Истифодаи методи расмии Telegram барои реаксияҳо
+        bot.set_message_reaction(
+            chat_id=chat_id,
+            message_id=message_id,
+            reaction=[telebot.types.ReactionTypeEmoji(emoji)]
+        )
+    except Exception as e:
+        print(f"Хатогӣ ҳангоми гузоштани реаксия: {e}")
+
+# Функсия барои муайян кардани никнейми админ (бо назардошти лимити 48 соат)
+def get_admin_mention(chat_id):
+    data = last_group_admins.get(chat_id)
+    if data:
+        # 48 соат = 172800 сония
+        if time.time() - data['last_time'] < 172800:
+            return data['username']
+    return "АДМИН"
+
+# Саволҳо ва ҷавобҳои динамикии бот
+def get_answers(chat_id):
+    admin = get_admin_mention(chat_id)
+    return {
+        'salom': 'Воаллейкум салом !',
+        'салом': 'Салом! Хушхолам шуморо мебинам 🫶',
+        'ссалом': 'ВОАЛЛЕЙКУМ САЛОМ ! Хуш омадед ❤️',
+        'сети': 'МАН ДАР СЕТАМ 24/7 🥰 \nБарои мухофизати гурух сохта шудаам. ',
+        'хуби': 'Хубам, раҳмат! 🥰. Шумо чихел?',
+        'sozi': 'Хубам, раҳмат! 🥰. Шумо чихел?',
+        'сози': 'Хубам, раҳмат! 🥰. Шумо чихел?',
+        'юс': f'Барои нарх ба {admin}  муроҷиат кунед.',
+        'uc': f'Барои нарх ба {admin}  муроҷиат кунед.',
+        'админ': f'ба {admin}  муроҷиат кунед.',
+        'admin': f'ба {admin}  муроҷиат кунед.',
+        'нарх': f'нархо барои барои харидани юс  {admin} ❤️',
+        'narx': f'нархо барои барои харидани юс  {admin} ❤️',
+        'рахмат': 'САЛОМАТ БОШЕН 🫶',
+        'ки мехара': f'√1 ГАРАНТ {admin} ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
+        'хариданийм': f'√1 ГАРАНТ {admin} ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
+        'фуруши дорм': f'√1 ГАРАНТ {admin} ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
+        'мефурушм': f'√1 ГАРАНТ {admin} ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
+        'мехарм': f'√1 ГАРАНТ {admin} ❤️ нависен. \n АГАР бе гарант СКАМ ХУРДЕН АДМИН ГНАХГОР НЕСТ!',
+        'аккаунт': f'аккаунт харидан ё фурухтани бошен лс {admin} ❤️ нависен',
+        'акаунт': f'аккаунт харидан ё фурухтани бошен лс {admin} ❤️ нависен',
+        'бот': f'СаЛоМ. \nМан зехни сунъи хастам ёрдамчии {admin} ❤️'
+    }
+
 # Функсия барои санҷидани админ будани корбар
 def is_admin(message):
     if message.chat.type == 'private':
         return False
     
-    # Агар ID-и худи шумо бошад ё паём анонимӣ аз номи канал/чат бошад
     if message.from_user.id == ADMIN_ID or message.sender_chat is not None:
         return True
         
@@ -90,14 +115,14 @@ def has_link_or_nickname(message):
 
     return False
 
-# Санҷиши калимаҳои манъшуда (акнун худи калимаи ёфтшударо бармегардонад)
+# Санҷиши калимаҳои манъшуда
 def find_bad_word(text):
     if not text:
         return None
     text = text.lower()
     for word in BAD_WORDS:
         if word in text:
-            return word  # Калимаи бади ёфтшударо бармегардонад
+            return word
     return None
 
 # Функсияи умумӣ барои блок (Restrict) кардани корбар ба вақти муайян
@@ -121,17 +146,43 @@ def filter_messages(message):
     user_name = message.from_user.first_name
     username = f"@{message.from_user.username}" if message.from_user.username else "Никнейм надорад"
 
-    # АГАР АДМИН БОШАД - ҲЕҶ ЧИЗРО ТОЗА НАКУН
-    if is_admin(message):
+    admin_status = is_admin(message)
+
+    # 1. Агар паём аз ҷониби АДМИН бошад:
+    if admin_status:
+        # Никнейми ӯ ва вақти паёмро барои ин гурӯҳ сабт мекунем (барои 48 соат)
+        if message.from_user.username:
+            last_group_admins[chat_id] = {
+                "username": f"@{message.from_user.username}",
+                "last_time": time.time()
+            }
+        
+        # Санҷиши дашномҳои худи админ (танҳо реаксияи ҳайрат мегузорем, паёмро тоза намекунем)
+        if message.content_type == 'text':
+            detected_bad_word = find_bad_word(message.text)
+            if detected_bad_word:
+                send_reaction(chat_id, message.message_id, "😱")
+                return
+
+        # Ҷавоб додан ба калимаҳои калидии админ ва гузоштани реаксияи мувофиқ
         if message.content_type == 'text':
             text = message.text.lower()
-            for word, answer in ANSWERS.items():
+            answers = get_answers(chat_id)
+            for word, answer in answers.items():
                 if word in text:
+                    # Вобаста ба калима реаксия мегузорем
+                    if 'салом' in word or 'salom' in word:
+                        send_reaction(chat_id, message.message_id, random.choice(["❤️", "🔥", "👍"]))
+                    elif 'рахмат' in word:
+                        send_reaction(chat_id, message.message_id, "🤝")
+                    
                     bot.reply_to(message, answer)
                     break
         return
 
-    # 1. Корбарони оддӣ: Нест кардани ссылка ё никнейм (@) ва додани 3 ОГОҲӢ (Блоки 24 соат)
+    # 2. Агар паём аз ҷониби КОРБАРИ ОДДӢ бошад:
+
+    # А) Санҷиши антиспам (ссылка ва никнеймҳо)
     if has_link_or_nickname(message):
         try:
             bot.delete_message(chat_id, message.message_id)
@@ -144,12 +195,12 @@ def filter_messages(message):
             if user_link_warnings[user_id] == 1:
                 bot.send_message(
                     chat_id, 
-                    f"⚠️ Корбар {user_name}, Ссылка ё никнейм манъ аст! Нагузоред, вагарна блок мешавед. Огоҳӣ: (1/3)"
+                    f"⚠️ Корбар {user_name}, Ссылка ё реклама манъ аст! Нагузоред, вагарна блок мешавед. Огоҳӣ: (1/3)"
                 )
             elif user_link_warnings[user_id] == 2:
                 bot.send_message(
                     chat_id, 
-                    f"⚠️ Корбар {user_name}, бори дуюм аст! Огоҳии охирин: (2/3)"
+                    f"⚠️ Корбар {user_name}, бори дуюм аст ки огохи гирифтед! Огоҳии охирин: (2/3)"
                 )
             elif user_link_warnings[user_id] >= 3:
                 restrict_user(chat_id, user_id, 86400) # 24 соат блок
@@ -162,15 +213,14 @@ def filter_messages(message):
             print(f"Хатогӣ дар антиспам: {e}")
         return
 
-    # 2. Корбарони оддӣ: Системаи 3 огоҳӣ барои калимаҳои бад (Блоки 1 соат)
+    # Б) Санҷиши калимаҳои ноҷо (Дашномҳо)
     if message.content_type == 'text':
         detected_bad_word = find_bad_word(message.text)
         if detected_bad_word:
             try:
-                # 1. Паёми ҳақоратдорро тоза мекунем
                 bot.delete_message(chat_id, message.message_id)
                 
-                # 2. Ба шумо (админ) огоҳиномаи махфӣ мефиристем
+                # Фиристодани отчёт ба личкаи супер-админ
                 group_title = message.chat.title if message.chat.title else "Гурӯҳи хусусӣ"
                 report_message = (
                     f"🚨 **Дашном ошкор шуд!**\n\n"
@@ -180,22 +230,21 @@ def filter_messages(message):
                     f"📝 **Паёми пурра:**\n_\"{message.text}\"_"
                 )
                 
-                # Фиристодани отчёт ба личкаи шумо
                 try:
                     bot.send_message(ADMIN_ID, report_message, parse_mode="Markdown")
                 except Exception as send_err:
                     print(f"Хатогӣ ҳангоми фиристодани отчёт ба админ: {send_err}")
 
-                # 3. Додани огоҳӣ ба корбар дар гурӯҳ
                 if user_id not in user_badword_warnings:
                     user_badword_warnings[user_id] = 0
                     
                 user_badword_warnings[user_id] += 1
                 
+                current_admin = get_admin_mention(chat_id)
                 if user_badword_warnings[user_id] == 1:
                     bot.send_message(
                         chat_id,
-                        f"⚠️ Корбар {user_name}, \n Дар гурух суханхои кабех ва дашном манъ аст! Огоҳӣ: (1/3)\nАДМИН: @ALI_UC_SHOPP ❤️"
+                        f"⚠️ Корбар {user_name}, \n Дар гурух суханхои кабех ва дашном манъ аст! Огоҳӣ: (1/3)\nАДМИН: {current_admin} ❤️"
                     )
                 elif user_badword_warnings[user_id] == 2:
                     bot.send_message(
@@ -203,23 +252,38 @@ def filter_messages(message):
                         f"⚠️ Корбар {user_name}, \n Бори дуюм аст! Огоҳии охирин барои калимаҳои ноҷо: (2/3)"
                     )
                 elif user_badword_warnings[user_id] >= 3:
-                    restrict_user(chat_id, user_id, 3600) # 1 соат блок (3600 сония)
+                    restrict_user(chat_id, user_id, 28800) # 8 соат блок
                     bot.send_message(
                         chat_id,
-                        f"🚫 Корбар {user_name} \n барои истифодаи суханхои кабех ё дашном ба муҳлати 1 соата блок шуд!"
+                        f"🚫 Корбар {user_name} \n барои истифодаи суханхои кабех ё дашном ба муҳлати 8 соат блок шуд!"
                     )
                     user_badword_warnings[user_id] = 0
             except Exception as e:
                 print(f"Хатогӣ дар тозакунии калимаҳо: {e}")
             return
 
-    # 3. Ҷавоб додан ба саволҳои оддӣ
+    # В) Ҷавоб додан ба саволҳои оддӣ ва гузоштани реаксияҳо
     if message.content_type == 'text':
         text = message.text.lower()
-        for word, answer in ANSWERS.items():
+        answers = get_answers(chat_id)
+        
+        for word, answer in answers.items():
             if word in text:
+                # Гузоштани реаксия ба паёми корбар пеш аз ҷавоб додан
+                if 'салом' in word or 'salom' in word:
+                    send_reaction(chat_id, message.message_id, random.choice(["❤️", "🔥", "👍"]))
+                elif 'рахмат' in word:
+                    send_reaction(chat_id, message.message_id, "🤝")
+                elif 'юс' in word or 'uc' in word or 'нарх' in word:
+                    send_reaction(chat_id, message.message_id, "⚡")
+                
                 bot.reply_to(message, answer)
-                break
+                return  # Корро ба охир мерасонем, то ба бахши рандом нагузарад
+
+        # Г) Баъзан ба таври тасодуфӣ (рандом - 10% имконият) ба паёмҳои оддӣ реаксияи хуб мегузорад
+        if random.random() < 0.10:
+            random_emoji = random.choice(["👍", "❤️", "🔥", "🥰", "🫶", "😂", "🤯", "🩵", "🎉", "😎"])
+            send_reaction(chat_id, message.message_id, random_emoji)
 
 # Ба кор андохтани сервер ва бот якбора
 if __name__ == "__main__":
