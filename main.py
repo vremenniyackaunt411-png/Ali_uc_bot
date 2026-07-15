@@ -1,15 +1,17 @@
 import os
 import time
 import random
+import re
 from threading import Thread
 from flask import Flask
 import telebot
 from telebot import types
 
+# ТОКЕНИ БОТ ВА ID-И СОҲИБИ АСОСӢ
 TOKEN = '8805476577:AAHlJF4UlB-n4bFRpMqKgj7WKqsXQp-LQqA'
-ADMIN_ID = 6871575684 
+ADMIN_ID = 6871575684
 
-# Танҳо никнейми асосӣ (бе линки канал)
+# Никнейми асосӣ
 MY_MAIN_ADMIN = "@ALI_UC_SHOPP"
 
 bot = telebot.TeleBot(TOKEN)
@@ -26,10 +28,10 @@ def run_flask():
     app.run(host='0.0.0.0', port=port)
 # -----------------------------------------------------------------
 
-user_link_warnings = {}     
-user_badword_warnings = {}  
+user_link_warnings = {}    
+user_badword_warnings = {} 
 
-# Базаи админҳо (акнун танҳо никнейм сабт мешавад, бе канал)
+# Базаи админҳо
 registered_admins = {
     ADMIN_ID: {"username": MY_MAIN_ADMIN}
 }
@@ -39,7 +41,7 @@ user_states = {}
 
 BAD_WORDS = [
     'кунте', 'кунти', 'гандон', 'сука',
-    'далбаёб',  'кери', 'керм', 'мегом', 'бгом', 'гойда', 'сина'
+    'далбаёб', 'кери', 'керм', 'мегом', 'бгом', 'гойда', 'сина'
 ]
 
 def send_reaction(chat_id, message_id, emoji):
@@ -66,7 +68,6 @@ def is_admin_in_this_chat(chat_id, message):
     return False
 
 def get_admin_mention(chat_id):
-    # Санҷиш: агар дар гурӯҳ соҳиби асосӣ бошад
     try:
         member = bot.get_chat_member(chat_id, ADMIN_ID)
         if member.status in ['creator', 'administrator']:
@@ -74,7 +75,6 @@ def get_admin_mention(chat_id):
     except Exception:
         pass
 
-    # Агар админи дигари сабтшуда бошад
     try:
         admins = bot.get_chat_administrators(chat_id)
         for admin in admins:
@@ -153,7 +153,7 @@ def restrict_user(chat_id, user_id, seconds):
 
 def get_start_keyboard(bot_username, user_id):
     markup = types.InlineKeyboardMarkup()
-    btn_register = types.InlineKeyboardButton("📝 Бақайдгирии Admin", callback_data="register_username_step")
+    btn_register = types.InlineKeyboardButton("📝 Рӯйхати сабти Админ", callback_data="register_username_step")
     btn_my_info = types.InlineKeyboardButton("ℹ️ Маълумоти ман", callback_data="my_info")
     markup.row(btn_register, btn_my_info)
     
@@ -197,7 +197,7 @@ def start_private(message):
     bot.send_message(user_id, welcome_text, reply_markup=markup, parse_mode="Markdown")
 
 
-# ================= СИСТЕМАИ БАҚАЙДГИРӢ БО 2 ҚАДАМ (ИНЛАЙН) =================
+# ================= СИСТЕМАИ БАҚАЙДГИРӢ =================
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
@@ -205,7 +205,6 @@ def callback_inline(call):
     chat_id = call.message.chat.id
     bot_info = bot.get_me()
     
-    # 1. САРШАВИИ БАҚАЙДГИРӢ (ҚАДАМИ 1: НИКНЕЙМ)
     if call.data == "register_username_step":
         if user_id == ADMIN_ID:
             bot.answer_callback_query(call.id, "👑 Шумо соҳиби асосӣ ҳастед, бақайдгирӣ лозим нест!", show_alert=True)
@@ -226,7 +225,6 @@ def callback_inline(call):
         )
         bot.answer_callback_query(call.id)
 
-    # 2. БОЗГАШТ БА ҚАДАМИ 1 (НИКНЕЙМ) АЗ ҚАДАМИ 2
     elif call.data == "back_to_username":
         user_states[user_id]["step"] = "waiting_for_username"
         markup = types.InlineKeyboardMarkup()
@@ -241,7 +239,6 @@ def callback_inline(call):
         )
         bot.answer_callback_query(call.id)
 
-    # 3. БЕКОР КАРДАНИ БАҚАЙДГИРӢ
     elif call.data == "cancel_registration":
         if user_id in user_states:
             del user_states[user_id]
@@ -255,7 +252,6 @@ def callback_inline(call):
             reply_markup=markup
         )
 
-    # 4. МАЪЛУМОТИ МАН
     elif call.data == "my_info":
         if user_id in registered_admins:
             data = registered_admins[user_id]
@@ -266,10 +262,9 @@ def callback_inline(call):
                 f"Маълумоти шумо тасдиқ шудааст ва шумо ҳуқуқи админ доред. ✅"
             )
         else:
-            bot.send_message(chat_id, "❌ Шумо то ҳол бақайдгирии тасдиқшуда надоред. Тугмаи '📝 Бақайдгирии Админ'-ро пахш кунед.")
+            bot.send_message(chat_id, "❌ Шумо то ҳол бақайдгирии тасдиқшуда надоред. Тугмаи '📝 Рӯйхати сабти Админ'-ро пахш кунед.")
         bot.answer_callback_query(call.id)
 
-    # 5. ГУРӮҲҲОИ МАН (БАРОИ СОҲИБИ БОТ)
     elif call.data == "owner_groups":
         if user_id != ADMIN_ID:
             bot.answer_callback_query(call.id, "❌ Ин тугма танҳо барои соҳиби бот аст!", show_alert=True)
@@ -288,7 +283,6 @@ def callback_inline(call):
         bot.send_message(chat_id, "👥 **Рӯйхати гурӯҳҳо:**\n\nГурӯҳеро интихоб кунед:", reply_markup=markup)
         bot.answer_callback_query(call.id)
 
-    # 6. ИНТИХОБИ ГУРӮҲ БАРОИ ФИРИСТОДАНИ ПАЁМ (СОҲИБ)
     elif call.data.startswith("sendto_"):
         if user_id != ADMIN_ID:
             bot.answer_callback_query(call.id)
@@ -307,11 +301,75 @@ def callback_inline(call):
         cancel_markup.add(types.InlineKeyboardButton("❌ Бекор кардан", callback_data="cancel_registration"))
         
         bot.send_message(
-            chat_id, 
+            chat_id,
             f"✍️ Навиштани паём ба гурӯҳи **\"{group_name}\"**:\n\n"
             f"Паёми худро фиристед. Барои бекор кардан тугмаи зеринро пахш кунед 👇",
             reply_markup=cancel_markup
         )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "check_status":
+        data = user_states.get(user_id, {})
+        if not data or data.get('step') != "waiting_for_group":
+            bot.send_message(chat_id, "❌ Хатогӣ! Лутфан бақайдгириро аз аввал оғоз кунед /start.")
+            bot.answer_callback_query(call.id)
+            return
+            
+        group_username = data['group_username']
+        nickname = data['username'].replace("@", "").lower()
+        
+        try:
+            # Санҷиш: оё бот дар ин гурӯҳ ҳаст ва ҳуқуқи гирифтани рӯйхати админҳоро дорад?
+            admins = bot.get_chat_administrators(group_username)
+            
+            # Санҷиш: оё худи корбар дар ҳақиқат дар рӯйхати админҳои ҳамон чат ҳаст?
+            user_is_admin = False
+            for admin in admins:
+                if admin.user.username and admin.user.username.lower() == nickname:
+                    user_is_admin = True
+                    break
+            
+            if user_is_admin:
+                registered_admins[user_id] = {
+                    "username": data["username"]
+                }
+                
+                try:
+                    chat_info = bot.get_chat(group_username)
+                    active_groups[chat_info.id] = chat_info.title
+                except Exception:
+                    pass
+                
+                del user_states[user_id]
+                
+                markup = get_start_keyboard(bot_info.username, user_id)
+                bot.send_message(
+                    chat_id,
+                    f"🎉 **Ҳамааш дуруст! Бақайдгирӣ тасдиқ шуд.**\n\n"
+                    f"✅ Бот дар гурӯҳи `{group_username}` бомуваффақият фаъол шуд!\n"
+                    f"✅ Никнейми шумо (`@{nickname}`) ҳамчун админи ҳақиқӣ сабт гардид.\n\n"
+                    f"Акнун бот дар ин гурӯҳ ба таври худкор бо никнейми шумо ба саволҳои корбарон ҷавоб медиҳад.",
+                    reply_markup=markup,
+                    parse_mode="Markdown"
+                )
+            else:
+                bot.send_message(
+                    chat_id,
+                    f"⚠️ **Мушкилӣ ошкор шуд!**\n\n"
+                    f"Бот ба гурӯҳ дастрасӣ дорад, вале никнейми `@{nickname}` дар рӯйхати администраторҳои ин гурӯҳ ёфт нашуд.\n\n"
+                    f"Лутфан боварӣ ҳосил кунед, ки никнеймро дар қадами якум дуруст навиштаед ё дар он гурӯҳ ҳуқуқи админ доред.",
+                    parse_mode="Markdown"
+                )
+                
+        except Exception as e:
+            bot.send_message(
+                chat_id,
+                f"❌ **Хатогии пайвастшавӣ!**\n\n"
+                f"Бот ҳанӯз ба гурӯҳи `{group_username}` илова нашудааст ё ба он ҳуқуқи администратор дода нашудааст.\n\n"
+                f"Лутфан тугмаи аввали болоро пахш карда, ботро ба гурӯҳ ҳамроҳ кунед ва ба он ҳуқуқи админ диҳед, пас аз он тугмаи санҷишро пахш кунед.",
+                parse_mode="Markdown"
+            )
+            
         bot.answer_callback_query(call.id)
 
 
@@ -338,7 +396,6 @@ def registration_text_inputs(message):
         user_states[user_id]["username"] = text_input
         user_states[user_id]["step"] = "waiting_for_group"
         
-        # Тугмаҳо барои Қадами 2 (бо тугмаи «⬅️ Ба ақиб»)
         markup = types.InlineKeyboardMarkup()
         markup.row(
             types.InlineKeyboardButton("⬅️ Ба ақиб", callback_data="back_to_username"),
@@ -346,114 +403,55 @@ def registration_text_inputs(message):
         )
         
         bot.send_message(
-            user_id, 
+            user_id,
             "👥 **Қадами 2:**\n\n"
             "Акнун **линки гурӯҳи худро** ворид кунед, ки бот дар онҷо ҳаст.\n"
-            "Мисол: `t.me/гурухи_шумо` ё `@гурухи_шумо`.\n\n"
-            "Бот ба таври худкор тафтиш мекунад, ки оё худи бот ва шумо дар онҷо админ ҳастед ё не.",
+            "Мисол: `https://t.me/ALI_US_SHOPP` ё `@ALI_US_SHOPP`.",
             reply_markup=markup
         )
         
-    # Қадами 2: ВОРУД КАРДАНИ ГУРӮҲ (ТАФТИШИ ДУТАРФАИ АДМИНКА БО ЛИНК)
+    # Қадами 2: ТАНЗИМИ ТУГМАҲО БАРОИ ИЛОВАИ БОТ ВА САНҶИШ
     elif step == "waiting_for_group":
-        group_identifier = text_input
-        target_chat_id = None
+        group_input = text_input
+        group_username = None
 
-        # Тоза кардани линк барои санҷиш, агар t.me бошад
-        if "t.me/" in group_identifier:
-            parts = group_identifier.split("t.me/")
-            if len(parts) > 1:
-                cleaned_name = parts[1].split("/")[0]
-                # Агар линки оммавӣ бошад
-                if not cleaned_name.startswith("+") and not cleaned_name.startswith("joinchat"):
-                    target_chat_id = f"@{cleaned_name}"
+        # Формат кардани линк ба никнейми гурӯҳ
+        if "t.me/" in group_input:
+            match = re.search(r"t\.me/([^/\?]+)", group_input)
+            if match:
+                group_username = f"@{match.group(1)}"
+        elif group_input.startswith("@"):
+            group_username = group_input
         else:
-            # Агар худи никнейми гурӯҳро бо @ навишта бошад
-            if group_identifier.startswith("@"):
-                target_chat_id = group_identifier
-            # Агар ID-и рақамӣ бошад
-            elif group_identifier.startswith("-"):
-                try:
-                    target_chat_id = int(group_identifier)
-                except ValueError:
-                    pass
+            group_username = f"@{group_input}"
 
-        if not target_chat_id:
-            bot.send_message(
-                user_id, 
-                "❌ Линки гурӯҳ нодуруст аст. Лутфан линкро дар намуди оммавӣ ба монанди `t.me/гурух` ё `@гурух` фиристед:"
-            )
+        if not group_username or "+" in group_username:
+            bot.reply_to(message, "❌ Лутфан танҳо линки умумии гурӯҳро (ки дорои никнейми оммавӣ бошад) равон кунед. Линки хусусӣ (бо аломати +) барои санҷиши худкор кор намекунад.")
             return
 
-        # Идоракунии тугмаи «Ба ақиб» дар сурати хатогӣ
-        error_markup = types.InlineKeyboardMarkup()
-        error_markup.row(
-            types.InlineKeyboardButton("⬅️ Ба ақиб", callback_data="back_to_username"),
-            types.InlineKeyboardButton("❌ Бекор кардан", callback_data="cancel_registration")
+        user_states[user_id]['group_username'] = group_username
+        
+        # Сохтани тугмаҳо барои Қадами 3
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        bot_username = bot.get_me().username
+        
+        # Линки автоматии иловаи бот бо ҳуқуқи админка
+        add_to_group_url = f"https://t.me/{bot_username}?startgroup=true&admin=post_messages+edit_messages+delete_messages+invite_users"
+        
+        btn_add = types.InlineKeyboardButton("➕ Илова кардани бот ва админ кардан", url=add_to_group_url)
+        btn_check = types.InlineKeyboardButton("🔄 Санҷиши иҷрои корҳо", callback_data="check_status")
+        btn_restart = types.InlineKeyboardButton("↩️ Аз аввал сар кардан", callback_data="cancel_registration")
+        
+        markup.add(btn_add, btn_check, btn_restart)
+        
+        text = (
+            f"**Қадами 3:** Корҳои зеринро иҷро кунед:\n\n"
+            f"1. Тугмаи аввали болоро пахш карда, ботро ба гурӯҳи хусусии худ илова кунед ва ба он ҳуқуқи **Администратор** диҳед.\n"
+            f"2. Пас аз илова намудан ва ҳуқуқи админ додан, тугмаи **'🔄 Санҷиши иҷрои корҳо'**-ро пахш кунед."
         )
+        bot.send_message(user_id, text, reply_markup=markup, parse_mode="Markdown")
 
-        try:
-            # 1. ТАФТИШИ АВВАЛ: Оё бот дар онҷо админ ҳаст ё не?
-            bot_member = bot.get_chat_member(target_chat_id, bot.get_me().id)
-            if bot_member.status not in ['administrator', 'creator']:
-                bot.send_message(
-                    user_id,
-                    "❌ **Хатогӣ: Бот админ нест!**\n\n"
-                    "Лутфан, аввал ба бот дар гурӯҳи худ ҳуқуқи Администратор (Админ)-ро диҳед, сипас аз нав кӯшиш кунед.",
-                    reply_markup=error_markup
-                )
-                return
-
-            # 2. ТАФТИШИ ДУЮМ: Оё худи корбар бо никнейми воридкардааш дар онҷо админ ҳаст?
-            user_member = bot.get_chat_member(target_chat_id, user_id)
-            if user_member.status not in ['administrator', 'creator']:
-                bot.send_message(
-                    user_id,
-                    "❌ **Хатогӣ: Шумо админ нестед!**\n\n"
-                    "Бот тафтиш кард ва маълум намуд, ки аккаунти шумо дар ин гурӯҳ ҳуқуқи Администраторро надорад.",
-                    reply_markup=error_markup
-                )
-                return
-
-            # АГАР ҲАМАИ САНҶИШҲО БОМУВАФФАҚИЯТ ГУЗАРАНД:
-            registered_admins[user_id] = {
-                "username": state_data["username"]
-            }
-            
-            try:
-                chat_info = bot.get_chat(target_chat_id)
-                active_groups[chat_info.id] = chat_info.title
-            except Exception:
-                pass
-            
-            # Тоза кардани ҳолати бақайдгирӣ
-            del user_states[user_id]
-            
-            bot_info = bot.get_me()
-            markup = get_start_keyboard(bot_info.username, user_id)
-            bot.send_message(
-                user_id, 
-                f"🎉 **Муваффақият! Бақайдгирӣ тасдиқ шуд.**\n\n"
-                f"✅ Бот дар гурӯҳи шумо админ аст.\n"
-                f"✅ Никнейми шумо (`{state_data['username']}`) ҳамчун админи ҳақиқӣ сабт шуд!\n\n"
-                f"Акнун бот дар гурӯҳ ба таври худкор ба саволҳои корбарон бо никнейми шумо ҷавоб медиҳад.",
-                reply_markup=markup,
-                parse_mode="Markdown"
-            )
-
-        except Exception as e:
-            bot.send_message(
-                user_id, 
-                f"❌ **Хатогии пайвастшавӣ!**\n\n"
-                f"Бот ба ин гурӯҳ дастрасӣ пайдо карда натавонист. Боварӣ ҳосил кунед, ки:\n"
-                f"1. Ботро ба гурӯҳ илова кардаед.\n"
-                f"2. Ба он ҳуқуқи админ додаед.\n\n"
-                f"Паёми хатогӣ: `{e}`",
-                reply_markup=error_markup,
-                parse_mode="Markdown"
-            )
-
-    # БАРОИ СОЗАНДА (ФИРИСТОДАНИ ПАЁМ БА ГУРӮҲ)
+    # ФИРИСТОДАНИ ПАЁМ БА ГУРӮҲ АЗ ТАРАФИ АДМИН
     elif step == "waiting_for_broadcast_text":
         target_id = state_data["target_group_id"]
         group_name = state_data["target_group_name"]
@@ -494,7 +492,7 @@ def filter_messages(message):
 
     admin_status = is_admin_in_this_chat(chat_id, message)
 
-     # 1. АГАР НАВИСАНДА АДМИН БОШАД:
+# 1. АГАР НАВИСАНДА АДМИН БОШАД:
     if admin_status:
         if message.content_type == 'text':
             detected_bad_word = find_bad_word(message.text)
