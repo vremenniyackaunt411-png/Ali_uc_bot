@@ -157,8 +157,14 @@ def has_link_or_nickname(message):
         for entity in message.entities:
             if entity.type in ['url', 'text_link', 'mention']:
                 return True
-    if message.text:
-        text = message.text.lower()
+    if message.caption_entities: # Илова шуд: санҷиши линкҳо дар зери расмҳо
+        for entity in message.caption_entities:
+            if entity.type in ['url', 'text_link', 'mention']:
+                return True
+                
+    # Санҷиши матни паём ё матни зери расм
+    text = (message.text or message.caption or "").lower()
+    if text:
         if "http" in text or "t.me" in text or "@" in text:
             if MY_MAIN_ADMIN.lower() in text or "bot" in text:
                 return False
@@ -244,7 +250,7 @@ def start_private(message):
     else:
         welcome_text = (
             f"Салом, {message.from_user.first_name}! 🤖\n\n"
-            f"Ман боти муҳофизи гурӯҳ ва ёрдамчии админ ҳастам.\n"
+            f"Ман боти муҳофизи гурӯҳ ва ёрдамчии admin ҳастам.\n"
             f"Барои бақайдгирӣ ва ҳамчун Админ сабт шудан тугмаи зеринро пахш кунед."
         )
 
@@ -485,16 +491,7 @@ def callback_inline(call):
                     chat_id,
                     f"⚠️ **Мушкилӣ ошкор шуд!**\n\n"
                     f"Бот ба гурӯҳ дастрасӣ дорад, вале никнейми `@{nickname}` дар рӯйхати администраторҳои ин гурӯҳ ёфт нашуд.\n\n"
-                    f"Лутфан боварӣ ҳосил кунед, ки никнеймро дар қадами якум дуруст навиштаед ё дар он гурӯҳ ҳуқуқи админ доред.",
-                    parse_mode="Markdown"
-                )
-                
-        except Exception as e:
-            bot.send_message(
-                chat_id,
-                f"❌ **Хатогии пайвастшавӣ!**\n\n"
-                f"Бот ҳанӯз ба гурӯҳи `{group_username}` илова нашудааст ё ба он ҳуқуқи администратор дода нашудааст.\n\n"
-                f"Лутфан тугмаи аввали болоро пахш карда, ботро ба гурӯҳ ҳамроҳ кунед ва ба он ҳуқуқи админ диҳед, пас аз он тугмаи санҷишро пахш кунед.",
+                    f"Лутфан тугмаи аввали болоро пахш карда, ботро ба гурӯҳ ҳамроҳ кунед ва ба он ҳуқуқи админ диҳед, пас аз он тугмаи санҷишро пахш кунед.",
                 parse_mode="Markdown"
             )
             
@@ -620,17 +617,19 @@ def filter_messages(message):
 
     # 1. АГАР НАВИСАНДА АДМИН БОШАД:
     if admin_status:
-        if message.content_type == 'text':
-            detected_bad_word = find_bad_word(message.text)
+        # Дар ин ҷо ҳам `message.text` ва ҳам `message.caption`-ро месанҷем
+        text_to_check = message.text or message.caption
+        if text_to_check:
+            detected_bad_word = find_bad_word(text_to_check)
             if detected_bad_word:
                 send_reaction(chat_id, message.message_id, "😱")
                 return
 
-            text = message.text.lower()
+            text_lower = text_to_check.lower()
             try:
                 answers = get_answers(chat_id)
                 for word, answer in answers.items():
-                    if word in text:
+                    if word in text_lower:
                         if 'салом' in word:
                             send_reaction(chat_id, message.message_id, random.choice(["❤️", "🔥", "👍"]))
                         elif 'рахмат' in word:
@@ -706,9 +705,10 @@ def filter_messages(message):
             print(f"Хатогӣ дар антиспам: {e}")
         return
 
-    # В) САНҶИШИ ДАШНОМҲО:
-    if message.content_type == 'text':
-        detected_bad_word = find_bad_word(message.text)
+    # В) САНҶИШИ ДАШНОМҲО (ҳам дар матн ва ҳам дар зери расм):
+    text_to_check = message.text or message.caption
+    if text_to_check:
+        detected_bad_word = find_bad_word(text_to_check)
         if detected_bad_word:
             try:
                 bot.delete_message(chat_id, message.message_id)
@@ -719,7 +719,7 @@ def filter_messages(message):
                     f"👥 <b>Гурӯҳ:</b> {group_title} (ID: <code>{chat_id}</code>)\n"
                     f"👤 <b>Нависанда:</b> {user_name} ({username}) (ID: <code>{user_id}</code>)\n"
                     f"🤬 <b>Калимаи ёфтшуда:</b> <code>{detected_bad_word}</code>\n"
-                    f"📝 <b>Паёми пурра:</b>\n<i>\"{message.text}\"</i>"
+                    f"📝 <b>Паёми пурра:</b>\n<i>\"{text_to_check}\"</i>"
                 )
                 
                 try:
@@ -774,6 +774,99 @@ def filter_messages(message):
         if random.random() < 0.10:
             random_emoji = random.choice(["👍", "❤️", "🔥", "🥰", "🫶", "😂", "🤯", "🩵", "🎉", "😎"])
             send_reaction(chat_id, message.message_id, random_emoji)
+
+
+# ================= СИСТЕМАИ НАЗОРАТИ ПАЁМҲОИ ТАҲРИРШУДА (EDITED MESSAGES) =================
+
+@bot.edited_message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice'])
+def filter_edited_messages(message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    user_name = message.from_user.first_name
+    username = f"@{message.from_user.username}" if message.from_user.username else "Никнейм надорад"
+
+    # Агар админ паёмашро таҳрир кунад, ба ӯ кордор намешавем
+    if is_admin_in_this_chat(chat_id, message):
+        return
+
+    # 1. Санҷиши линк ва реклама ҳангоми таҳрири паём
+    if has_link_or_nickname(message):
+        try:
+            bot.delete_message(chat_id, message.message_id)
+            
+            if user_id not in user_link_warnings:
+                user_link_warnings[user_id] = 0
+            user_link_warnings[user_id] += 1
+            
+            if user_link_warnings[user_id] == 1:
+                bot.send_message(
+                    chat_id, 
+                    f"⚠️ Корбар {user_name}, Таҳрир карда илова кардани линк ё реклама манъ аст! Огоҳӣ: (1/3)"
+                )
+            elif user_link_warnings[user_id] == 2:
+                bot.send_message(
+                    chat_id, 
+                    f"⚠️ Корбар {user_name}, бори дуюм аст! Огоҳии охирин: (2/3)"
+                )
+            elif user_link_warnings[user_id] >= 3:
+                restrict_user(chat_id, user_id, 86400)
+                bot.send_message(
+                    chat_id, 
+                    f"🚫 Корбар {user_name} қоидаро 3 бор шикаст ва барои реклама ба муҳлати 24 соат блок шуд!"
+                )
+                user_link_warnings[user_id] = 0
+        except Exception as e:
+            print(f"Хатогӣ дар антиспами таҳриршуда: {e}")
+        return
+
+    # 2. Санҷиши дашномҳо ҳангоми таҳрири паём (ҳам матн ва ҳам зери расм)
+    text_to_check = message.text or message.caption
+    if text_to_check:
+        detected_bad_word = find_bad_word(text_to_check)
+        if detected_bad_word:
+            try:
+                bot.delete_message(chat_id, message.message_id)
+                
+                group_title = message.chat.title if message.chat.title else "Чат"
+                report_message = (
+                    f"🚨 <b>Дашном ҳангоми таҳрири паём ошкор шуд!</b>\n\n"
+                    f"👥 <b>Гурӯҳ:</b> {group_title} (ID: <code>{chat_id}</code>)\n"
+                    f"👤 <b>Нависанда:</b> {user_name} ({username}) (ID: <code>{user_id}</code>)\n"
+                    f"🤬 <b>Калимаи ёфтшуда:</b> <code>{detected_bad_word}</code>\n"
+                    f"📝 <b>Паёми таҳриршудаи пурра:</b>\n<i>\"{text_to_check}\"</i>"
+                )
+                
+                try:
+                    bot.send_message(ADMIN_ID, report_message, parse_mode="HTML")
+                except Exception as send_err:
+                    print(f"Хатогӣ дар отчёти таҳрири паём: {send_err}")
+
+                if user_id not in user_badword_warnings:
+                    user_badword_warnings[user_id] = 0
+                user_badword_warnings[user_id] += 1
+                
+                current_admin = get_admin_mention(chat_id)
+                if user_badword_warnings[user_id] == 1:
+                    bot.send_message(
+                        chat_id,
+                        f"⚠️ Корбар {user_name}, \n Таҳрир карда илова кардани суханҳои қабеҳ манъ аст! Огоҳӣ: (1/3)\nАДМИН: {current_admin} ❤️"
+                    )
+                elif user_badword_warnings[user_id] == 2:
+                    bot.send_message(
+                        chat_id,
+                        f"⚠️ Корбар {user_name}, \n Бори дуюм аст! Огоҳии охирин барои калимаҳои ноҷо: (2/3)"
+                    )
+                elif user_badword_warnings[user_id] >= 3:
+                    restrict_user(chat_id, user_id, 28800)
+                    bot.send_message(
+                        chat_id,
+                        f"🚫 Корбар {user_name} \n барои истифодаи дашном (ҳангоми таҳрир) ба муҳлати 8 соат блок шуд!"
+                    )
+                    user_badword_warnings[user_id] = 0
+            except Exception as e:
+                print(f"Хатогӣ дар тозакунии калимаҳои таҳриршуда: {e}")
+            return
+
 
 if __name__ == "__main__":
     t = Thread(target=run_flask)
