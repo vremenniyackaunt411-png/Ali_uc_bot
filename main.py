@@ -47,7 +47,6 @@ BAD_WORDS = [
 # ----------------- СИСТЕМАИ САБТ ВА БОРКУНИИ ФАЙЛҲОИ JSON -----------------
 def load_data():
     global registered_admins, active_groups
-    # Боркунии админҳо
     if os.path.exists('admins.json'):
         try:
             with open('admins.json', 'r', encoding='utf-8') as f:
@@ -59,7 +58,6 @@ def load_data():
     else:
         registered_admins = {ADMIN_ID: {"username": MY_MAIN_ADMIN, "group_username": None}}
 
-    # Боркунии гурӯҳҳо
     if os.path.exists('groups.json'):
         try:
             with open('groups.json', 'r', encoding='utf-8') as f:
@@ -105,25 +103,17 @@ def is_admin_in_this_chat(chat_id, message):
         print(f"Хатогӣ ҳангоми санҷиши ҳуқуқи admin: {e}")
     return False
 
-# Ислоҳи мушкили 1: Баргардонидани калимаи "Админ" дар сурати набудани админи сабтшуда
 def get_admin_mention(chat_id):
     try:
         admins = bot.get_chat_administrators(chat_id)
-        
-        # 1. Санҷиш: Оё ягон админи дигари бақайдгирифташуда дар ин гурӯҳ ҳаст?
         for admin in admins:
             if admin.user.id in registered_admins and admin.user.id != ADMIN_ID:
                 return registered_admins[admin.user.id]['username']
-        
-        # 2. Агар админи дигар набошад, оё худи шумо (соҳиби бот) ҳамчун админ ҳастед?
         for admin in admins:
             if admin.user.id == ADMIN_ID:
                 return MY_MAIN_ADMIN
-                
     except Exception as e:
         print(f"Хатогӣ ҳангоми гирифтани админҳои гурӯҳ: {e}")
-
-    # Агар ягон админи бақайдгирифташуда дар ин гурӯҳ набошад, танҳо "Админ" менависад
     return "Админ"
 
 def get_answers(chat_id):
@@ -157,12 +147,11 @@ def has_link_or_nickname(message):
         for entity in message.entities:
             if entity.type in ['url', 'text_link', 'mention']:
                 return True
-    if message.caption_entities: # Илова шуд: санҷиши линкҳо дар зери расмҳо
+    if message.caption_entities: 
         for entity in message.caption_entities:
             if entity.type in ['url', 'text_link', 'mention']:
                 return True
                 
-    # Санҷиши матни паём ё матни зери расм
     text = (message.text or message.caption or "").lower()
     if text:
         if "http" in text or "t.me" in text or "@" in text:
@@ -202,15 +191,14 @@ def restrict_user(chat_id, user_id, seconds):
     except Exception as e:
         print(f"Хатогӣ ҳангоми маҳдуд кардани корбар: {e}")
 
-# Клавиатураи доимии поёнӣ (Reply Keyboard)
 def get_bottom_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_menu = types.KeyboardButton("🏠 ...")
     btn_menu = types.KeyboardButton("🏠 Менюи Асосӣ")
     btn_update = types.KeyboardButton("🔄 Навсозӣ (Обновить)")
     markup.row(btn_menu, btn_update)
     return markup
 
-# Менюи дохили паём (Inline Keyboard)
 def get_start_keyboard(bot_username, user_id):
     markup = types.InlineKeyboardMarkup()
     btn_register = types.InlineKeyboardButton("📝 Рӯйхати сабти Админ", callback_data="register_username_step")
@@ -245,7 +233,7 @@ def start_private(message):
             f"Салом, Оғои Император! 👑\n\n"
             f"Шумо соҳиби асосии бот ҳастед. Маълумоти шумо ба таври худкор сабт шуд:\n"
             f"👤 Никнейми шумо: `{MY_MAIN_ADMIN}`\n\n"
-            f"Идоракунии бот ва гурӯҳҳо аз менюи зерин 👇"
+            f"Ипоракунии бот ва гурӯҳҳо аз менюи зерин 👇"
         )
     else:
         welcome_text = (
@@ -257,7 +245,6 @@ def start_private(message):
     inline_markup = get_start_keyboard(bot_info.username, user_id)
     reply_markup = get_bottom_keyboard()
     
-    # Аввал клавиатураи поёниро мефиристем ва баъд менюи асосиро
     bot.send_message(user_id, welcome_text, reply_markup=inline_markup, parse_mode="Markdown")
     bot.send_message(user_id, "Интихоби амалҳо аз тугмаҳои поён 👇", reply_markup=reply_markup)
 
@@ -269,7 +256,7 @@ def handle_text_buttons(message):
     user_id = message.from_user.id
     bot_info = bot.get_me()
     
-    if message.text == "🏠 Менюи Асосӣ":
+    if message.text == "🏠 ...":
         if user_id in user_states:
             del user_states[user_id]
             
@@ -314,7 +301,6 @@ def handle_text_buttons(message):
             if user_is_admin:
                 bot.send_message(user_id, f"✅ **Маълумот навсозӣ шуд (Обновлено)!**\n\nШумо то ҳол админи гурӯҳи `{group_username}` ҳастед ва бот бо никнейми шумо (`@{nickname}`) кор мекунад.")
             else:
-                # Агар дигар админ набошад, аз база тоза мекунем
                 del registered_admins[user_id]
                 save_data()
                 bot.send_message(
@@ -340,7 +326,7 @@ def callback_inline(call):
     
     if call.data == "register_username_step":
         if user_id == ADMIN_ID:
-            bot.answer_callback_query(call.id, "👑 Шумо соҳиби асосӣ ҳастед, бақайдгирӣ лозим нест!", show_alert=True)
+            bot.answer_callback_query(call.id, "👑 inline_markup", show_alert=True)
             return
             
         user_states[user_id] = {"step": "waiting_for_username"}
@@ -491,7 +477,16 @@ def callback_inline(call):
                     chat_id,
                     f"⚠️ **Мушкилӣ ошкор шуд!**\n\n"
                     f"Бот ба гурӯҳ дастрасӣ дорад, вале никнейми `@{nickname}` дар рӯйхати администраторҳои ин гурӯҳ ёфт нашуд.\n\n"
-                    f"Лутфан тугмаи аввали болоро пахш карда, ботро ба гурӯҳ ҳамроҳ кунед ва ба он ҳуқуқи админ диҳед, пас аз он тугмаи санҷишро пахш кунед.",
+                    f"Лутфан боварӣ ҳосил кунед, ки никнеймро дар қадами якум дуруст навиштаед ё дар он гурӯҳ ҳуқуқи админ доред.",
+                    parse_mode="Markdown"
+                )
+                
+        except Exception as e:
+            bot.send_message(
+                chat_id,
+                f"❌ **Хатогии пайвастшавӣ!**\n\n"
+                f"Бот ҳанӯз ба гурӯҳи `{group_username}` илова нашудааст ё ба он ҳуқуқи администратор дода нашудааст.\n\n"
+                f"Лутфан тугмаи аввали болоро пахш карда, ботро ба гурӯҳ ҳамроҳ кунед ва ба он ҳуқуқи админ диҳед, пас аз он тугмаи санҷишро пахш кунед.",
                 parse_mode="Markdown"
             )
             
@@ -499,6 +494,7 @@ def callback_inline(call):
 
 
 # ================= ҚАДАМҲОИ ВОРУД КАРДАНИ МАЪЛУМОТИ МАТНИИ БАҚАЙДГИРӢ =================
+
 
 @bot.message_handler(func=lambda message: message.from_user.id in user_states, chat_types=['private'])
 def registration_text_inputs(message):
@@ -512,7 +508,6 @@ def registration_text_inputs(message):
         start_private(message)
         return
 
-    # Қадами 1: ВОРУД КАРДАНИ НИКНЕЙМ
     if step == "waiting_for_username":
         if not text_input.startswith("@"):
             bot.send_message(user_id, "❌ Никнейм бояд бо `@` сар шавад! Масалан: `@ALI_UC_SHOPP` \n\nЛутфан аз нав нависед:")
@@ -535,7 +530,6 @@ def registration_text_inputs(message):
             reply_markup=markup
         )
         
-    # Қадами 2: ТАНЗИМИ ТУГМАҲО БАРОИ ИЛОВАИ БОТ ВА САНҶИШ
     elif step == "waiting_for_group":
         group_input = text_input
         group_username = None
@@ -573,7 +567,6 @@ def registration_text_inputs(message):
         )
         bot.send_message(user_id, text, reply_markup=markup, parse_mode="Markdown")
 
-    # ФИРИСТОДАНИ ПАЁМ БА ГУРӮҲ АЗ ТАРАФИ АДМИН
     elif step == "waiting_for_broadcast_text":
         target_id = state_data["target_group_id"]
         group_name = state_data["target_group_name"]
@@ -600,8 +593,8 @@ def registration_text_inputs(message):
 
 # ==============================================================================
 
-
-@bot.message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice'])
+# МУҲИМТАРИН ТАҒЙИРОТ: Рӯйхати пурраи намуди медиа-паёмҳо ба ороишгар (декоратор) илова шуд!
+@bot.message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note'])
 def filter_messages(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -617,7 +610,6 @@ def filter_messages(message):
 
     # 1. АГАР НАВИСАНДА АДМИН БОШАД:
     if admin_status:
-        # Дар ин ҷо ҳам `message.text` ва ҳам `message.caption`-ро месанҷем
         text_to_check = message.text or message.caption
         if text_to_check:
             detected_bad_word = find_bad_word(text_to_check)
@@ -692,6 +684,7 @@ def filter_messages(message):
             elif user_link_warnings[user_id] == 2:
                 bot.send_message(
                     chat_id, 
+                    f"⚠️ ...",
                     f"⚠️ Корбар {user_name}, бори дуюм аст ки огохи гирифтед! Огоҳии охирин: (2/3)"
                 )
             elif user_link_warnings[user_id] >= 3:
@@ -705,7 +698,7 @@ def filter_messages(message):
             print(f"Хатогӣ дар антиспам: {e}")
         return
 
-    # В) САНҶИШИ ДАШНОМҲО (ҳам дар матн ва ҳам дар зери расм):
+    # В) САНҶИШИ ДАШНОМҲО (дар матни паём ва зери тамоми намуди файлҳо):
     text_to_check = message.text or message.caption
     if text_to_check:
         detected_bad_word = find_bad_word(text_to_check)
@@ -778,14 +771,13 @@ def filter_messages(message):
 
 # ================= СИСТЕМАИ НАЗОРАТИ ПАЁМҲОИ ТАҲРИРШУДА (EDITED MESSAGES) =================
 
-@bot.edited_message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice'])
+@bot.edited_message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note'])
 def filter_edited_messages(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
     user_name = message.from_user.first_name
     username = f"@{message.from_user.username}" if message.from_user.username else "Никнейм надорад"
 
-    # Агар админ паёмашро таҳрир кунад, ба ӯ кордор намешавем
     if is_admin_in_this_chat(chat_id, message):
         return
 
@@ -860,6 +852,7 @@ def filter_edited_messages(message):
                     restrict_user(chat_id, user_id, 28800)
                     bot.send_message(
                         chat_id,
+                        f"🚫 ...",
                         f"🚫 Корбар {user_name} \n барои истифодаи дашном (ҳангоми таҳрир) ба муҳлати 8 соат блок шуд!"
                     )
                     user_badword_warnings[user_id] = 0
