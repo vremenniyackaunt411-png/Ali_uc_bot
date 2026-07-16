@@ -36,6 +36,7 @@ def save_json(filename, data):
     except Exception as e:
         print(f"Хатогии сабти {filename}: {e}")
 
+# Хориҷ кардани глобалӣ барои пешгирии SyntaxError
 warnings = load_json(WARN_FILE)
 groups_db = load_json(GROUPS_FILE)  
 
@@ -140,24 +141,22 @@ def delete_left_member_message(message):
         print(f"Хатогии нест кардани паёми баромадан: {e}")
 
 # ==========================================
-# МЕНЮИ ЛИЧКАИ БОТ (ИҶРОИ ТОЗАКОРӢ)
+# МЕНЮИ ЛИЧКАИ БОТ
 # ==========================================
 @bot.message_handler(commands=["start"])
 def start(message):
     if message.chat.type != "private":
         return
 
-    # ҚАДАМИ 1: Маҷбуран тоза кардани тамоми тугмаҳои кӯҳнаи экран
-    msg_clear = bot.send_message(
+    # Тоза кардани тугмаҳои кӯҳна
+    bot.send_message(
         message.chat.id, 
         "🔄 Танзимоти тугмаҳо навсозӣ шуда истодааст...", 
         reply_markup=types.ReplyKeyboardRemove()
     )
     
-    # Як сония интизор мешавем, то Телеграм тугмаҳоро тоза кунад
     time.sleep(1)
     
-    # ҚАДАМИ 2: Сохтани тугмаҳои нави тоза
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_add = types.KeyboardButton("➕ Илова ба гурӯҳ")
     markup.add(btn_add)
@@ -166,12 +165,10 @@ def start(message):
         btn_groups = types.KeyboardButton("👑 Гурӯҳҳои пайвастшуда")
         markup.add(btn_groups)
 
-    # ҚАДАМИ 3: Фиристодани паёми асосӣ бо тугмаҳои нав
     bot.send_message(
         message.chat.id,
         f"Салом, {message.from_user.first_name}! 🤖\n\n"
-        "Интерфейси бот бомуваффақият навсозӣ шуд ва тугмаҳои иловагӣ тоза карда шуданд. "
-        "Лутфан тугмаи дилхоҳро пахш кунед 👇",
+        "Интерфейси бот бомуваффақият навсозӣ шуд. Лутфан тугмаи дилхоҳро пахш кунед 👇",
         reply_markup=markup
     )
 
@@ -287,6 +284,7 @@ def add_warning(message, reason):
     chat_id = str(message.chat.id)
     key = f"{chat_id}_{user_id}"
 
+    # ИСЛОҲ ШУД: Истифодаи дурусти load_json
     global warnings
     warnings = load_json(WARN_FILE)
 
