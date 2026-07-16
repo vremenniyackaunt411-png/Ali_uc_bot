@@ -9,7 +9,7 @@ TOKEN = "8805476577:AAHlJF4UlB-n4bFRpMqKgj7WKqsXQp-LQqA"
 bot = telebot.TeleBot(TOKEN)
 
 # ==========================================
-# ID-И СОЗАНДАИ БОТ (АКНУН ИДОРАКУНӢ БАРОИ ШУМОСТ)
+# ID-И СОЗАНДАИ БОТ
 # ==========================================
 OWNER_ID = 6871575684  
 
@@ -59,7 +59,7 @@ ANSWERS = {
 # Калимаҳои манъшуда
 # ==========================
 BAD_WORDS = [
-    'кунте', 'кунти', 'гандон', 'сука', 'сучка',
+    'кунте', 'кунти', 'гандон', 'сука',
     'далбаёб', 'кери', 'керм', 'мегом', 'бгом', 'гойда', 'сина'
 ]
 
@@ -140,13 +140,14 @@ def delete_left_member_message(message):
         print(f"Хатогии нест кардани паёми баромадан: {e}")
 
 # ==========================================
-# МЕНЮИ ЛИЧКАИ БОТ
+# МЕНЮИ ЛИЧКАИ БОТ (ИДОРАКУНИИ ТУГМАҲО)
 # ==========================================
 @bot.message_handler(commands=["start"])
 def start(message):
     if message.chat.type != "private":
         return
 
+    # Ислоҳ шуд: Акнун тугмаҳои изофӣ нест карда шуданд
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_add = types.KeyboardButton("➕ Илова ба гурӯҳ")
     markup.add(btn_add)
@@ -157,8 +158,8 @@ def start(message):
 
     bot.send_message(
         message.chat.id,
-        "🤖 Салом! Ман боти назоратчии гурӯҳи шумо ҳастам.\n"
-        "Лутфан аз тугмаҳои зерин истифода баред 👇",
+        f"Салом, {message.from_user.first_name}! 🤖\n\n"
+        "Ман боти назоратчии гурӯҳ ҳастам. Лутфан тугмаи дилхоҳро пахш кунед 👇",
         reply_markup=markup
     )
 
@@ -196,7 +197,7 @@ def show_owner_groups(message):
         btn = types.InlineKeyboardButton(f"📁 {title}", callback_data=f"manage_{gid}")
         markup.add(btn)
 
-    bot.send_message(message.chat.id, "📋 Рӯйхати гурӯҳҳое, ки бот дар онҳо ҳаст. Як гурӯҳро интихоб кунед:", reply_markup=markup)
+    bot.send_message(message.chat.id, "📋 Як гурӯҳро барои идоракунӣ интихоб кунед:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
@@ -285,7 +286,6 @@ def add_warning(message, reason):
 
     count = warnings[key]
 
-    # Фиристодани отчёт ба личкаи шумо, агар касе дашном диҳад
     if reason == "Сухани манъшуда":
         try:
             notification_text = (
@@ -363,7 +363,7 @@ def check_messages(message):
         if member.status in ["administrator", "creator"]:
             return
     except Exception as e:
-        print(f"Хатогӣ ҳангоми санҷиши ҳуқуқи админ: {e}")
+        print(f"Хатогӣ ҳангоми санҷиши ҳуқуқи admin: {e}")
 
     if has_link(message):
         try:
