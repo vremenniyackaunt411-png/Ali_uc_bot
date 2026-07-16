@@ -60,14 +60,14 @@ BAD_WORDS = [
     'далбаёб', 'кери', 'керм', 'мегом', 'бгом', 'гойда', 'сина'
 ]
 
-def has_bad_words(text):
+def check_bad_words(text):
     if not text:
-        return False
-    text = text.lower()
+        return None
+    text_lower = text.lower()
     for word in BAD_WORDS:
-        if re.search(r"\b" + re.escape(word) + r"\b", text):
-            return True
-    return False
+        if word in text_lower:
+            return word  # Калимаи ёфташударо бармегардонад
+    return None
 
 def has_link(message):
     if message.entities:
@@ -135,21 +135,15 @@ def delete_left_member_message(message):
         print(f"Хатогии нест кардани паёми баромадан: {e}")
 
 # ==========================================
-# МЕНЮИ ЛИЧКАИ БОТ
+# МЕНЮИ ЛИЧКАИ БОТ (ИҶРОИ БАНДИ 3)
 # ==========================================
 @bot.message_handler(commands=["start"])
 def start(message):
     if message.chat.type != "private":
         return
 
-    # Маҷбуран тоза кардани тугмаҳои кӯҳна
-    bot.send_message(
-        message.chat.id, 
-        "🔄 Танзимоти тугмаҳо навсозӣ шуда истодааст...", 
-        reply_markup=types.ReplyKeyboardRemove()
-    )
-    
-    time.sleep(1)
+    # Тоза кардани кеши тугмаҳо
+    bot.send_message(message.chat.id, "⌛", reply_markup=types.ReplyKeyboardRemove())
     
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_add = types.KeyboardButton("➕ Илова ба гурӯҳ")
@@ -159,12 +153,18 @@ def start(message):
         btn_groups = types.KeyboardButton("👑 Гурӯҳҳои пайвастшуда")
         markup.add(btn_groups)
 
-    bot.send_message(
-        message.chat.id,
+    # Ислоҳ шуд: Матни фаҳмондадиҳии вазифаҳои бот ба ҷои калимаи "Танзим"
+    about_bot = (
         f"Салом, {message.from_user.first_name}! 🤖\n\n"
-        "Интерфейси бот бомуваффақият навсозӣ шуд. Танҳо тугмаҳои зарурӣ боқӣ монданд 👇",
-        reply_markup=markup
+        "**Ман боти муҳофизи гурӯҳҳо ҳастам ва корҳои зеринро иҷро карда метавонам:**\n"
+        "🚫 Тоза кардани дашномҳо ва суханҳои ноҷо аз чат\n"
+        "🔗 Нест кардани линкҳо (ссылка) ва рекламаҳо\n"
+        "📧 Нест кардани паёмҳои форвардшуда (переслать)\n"
+        "👤 Огоҳӣ додан ва маҳдуд (mute) кардани корбарони қоидавайронкун\n\n"
+        "Лутфан тугмаи дилхоҳро пахш кунед 👇"
     )
+
+    bot.send_message(message.chat.id, about_bot, reply_markup=markup, parse_mode="Markdown")
 
 @bot.message_handler(func=lambda message: message.text == "➕ Илова ба гурӯҳ" and message.chat.type == "private")
 def add_to_group_info(message):
@@ -251,7 +251,6 @@ def callback_handler(call):
                 del groups_db[gid]
                 save_json(GROUPS_FILE, groups_db)
                 
-            # Навсозии рӯйхат пас аз баромадан
             markup = types.InlineKeyboardMarkup()
             for g_id, title in groups_db.items():
                 btn = types.InlineKeyboardButton(f"📁 {title}", callback_data=f"manage_{g_id}")
@@ -277,10 +276,10 @@ def send_msg_to_group(message, gid):
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Хатогӣ дар фиристодани паём: {e}")
 
-# ==========================
-# ОГОҲИИ СУХАНИ НОҶО БА ШУМО (OWNER)
-# ==========================
-def add_warning(message, reason):
+# ==========================================
+# ОГОҲИИ СУХАНИ НОҶО БА ШУМО (OWNER) - (ИҶРОИ БАНДИ 2)
+# ==========================================
+def add_warning(message, reason, bad_word_found=None):
     user_id = str(message.from_user.id)
     chat_id = str(message.chat.id)
     key = f"{chat_id}_{user_id}"
@@ -295,17 +294,19 @@ def add_warning(message, reason):
 
     count = warnings[key]
 
-    if reason == "Сухани манъшуда":
-        try:
-            notification_text = (
-                f"🚨 **СУХАНИ НОҶО ДАР ГУРӮҲ!**\n\n"
-                f"📍 Гурӯҳ: {message.chat.title} (ID: `{message.chat.id}`)\n"
-                f"👤 Корбар: {message.from_user.first_name} (@{message.from_user.username if message.from_user.username else 'бе_никнейм'})\n"
-                f"📝 Паёми навишташуда: `{message.text}`"
-            )
-            bot.send_message(OWNER_ID, notification_text, parse_mode="Markdown")
-        except Exception as e:
-            print(f"Хатогии фиристодани огоҳинома ба созанда: {e}")
+    # Ислоҳ шуд: Акнун огоҳинома ба личкаи созанда матни пурраи ҷумла ва калимаро нишон медиҳад
+    try:
+        word_detail = f"\n📝 **Калимаи ноҷо:** `{bad_word_found}`" if bad_word_found else ""
+        notification_text = (
+            f"🚨 **ҚОИДАВАЙРОНКУНӢ ДАР ГУРӮҲ!**\n\n"
+            f"📍 **Гурӯҳ:** {message.chat.title} (ID: `{message.chat.id}`)\n"
+            f"👤 **Корбар:** {message.from_user.first_name} (@{message.from_user.username if message.from_user.username else 'бе_никнейм'})\n"
+            f"⚠️ **Сабаб:** {reason}{word_detail}\n"
+            f"💬 **Пурра худи ҷумла:** `{message.text}`"
+        )
+        bot.send_message(OWNER_ID, notification_text, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Хатогии фиристодани огоҳинома ба созанда: {e}")
 
     if count < 3:
         bot.reply_to(
@@ -350,7 +351,7 @@ def add_warning(message, reason):
             print(f"Хатогӣ дар иҷрои restrict_chat_member: {e}")
 
 # ==========================
-# Коркарди ҳамаи паёмҳо
+# Коркарди ҳамаи паёмҳо (ИҶРОИ БАНДИ 1)
 # ==========================
 @bot.message_handler(
     func=lambda message: True,
@@ -367,13 +368,15 @@ def check_messages(message):
 
     register_group(message.chat)
 
+    # ИСЛОҲ ШУД: Агар корбар Админ ё Созандаи гурӯҳ бошад, бот умуман паёми ӯро тафтиш ва тоза НАМЕКУНАД!
     try:
         member = bot.get_chat_member(message.chat.id, message.from_user.id)
-        if member.status in ["administrator", "creator"]:
-            return
+        if member.status in ["administrator", "creator"] or message.from_user.id == OWNER_ID:
+            return  # Ҳеҷ амале иҷро намешавад
     except Exception as e:
         print(f"Хатогӣ ҳангоми санҷиши ҳуқуқи admin: {e}")
 
+    # Корбарони оддӣ тафтиш карда мешаванд:
     if has_link(message):
         try:
             bot.delete_message(message.chat.id, message.message_id)
@@ -398,12 +401,13 @@ def check_messages(message):
         add_warning(message, "Пересланный паём")
         return
 
-    if has_bad_words(message.text):
+    bad_word = check_bad_words(message.text)
+    if bad_word:
         try:
             bot.delete_message(message.chat.id, message.message_id)
         except:
             pass
-        add_warning(message, "Сухани манъшуда")
+        add_warning(message, "Сухани манъшуда", bad_word)
         return
 
     text = message.text.lower()
