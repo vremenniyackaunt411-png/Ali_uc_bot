@@ -36,10 +36,6 @@ def save_json(filename, data):
     except Exception as e:
         print(f"Хатогии сабти {filename}: {e}")
 
-# Хориҷ кардани глобалӣ барои пешгирии SyntaxError
-warnings = load_json(WARN_FILE)
-groups_db = load_json(GROUPS_FILE)  
-
 # ==========================
 # Ҷавобҳои автоматӣ
 # ==========================
@@ -98,7 +94,6 @@ def is_forward(message):
 # САБТИ АВТОМАТИИ ГУРӮҲҲО
 # ==========================
 def register_group(chat):
-    global groups_db
     groups_db = load_json(GROUPS_FILE)
     chat_id = str(chat.id)
     if chat_id not in groups_db:
@@ -128,7 +123,6 @@ def welcome_new_member(message):
 def delete_left_member_message(message):
     try:
         if message.left_chat_member.id == bot.get_me().id:
-            global groups_db
             groups_db = load_json(GROUPS_FILE)
             chat_id = str(message.chat.id)
             if chat_id in groups_db:
@@ -148,7 +142,7 @@ def start(message):
     if message.chat.type != "private":
         return
 
-    # Тоза кардани тугмаҳои кӯҳна
+    # Маҷбуран тоза кардани тугмаҳои кӯҳна
     bot.send_message(
         message.chat.id, 
         "🔄 Танзимоти тугмаҳо навсозӣ шуда истодааст...", 
@@ -168,7 +162,7 @@ def start(message):
     bot.send_message(
         message.chat.id,
         f"Салом, {message.from_user.first_name}! 🤖\n\n"
-        "Интерфейси бот бомуваффақият навсозӣ шуд. Лутфан тугмаи дилхоҳро пахш кунед 👇",
+        "Интерфейси бот бомуваффақият навсозӣ шуд. Танҳо тугмаҳои зарурӣ боқӣ монданд 👇",
         reply_markup=markup
     )
 
@@ -194,7 +188,6 @@ def show_owner_groups(message):
     if message.from_user.id != OWNER_ID:
         return
 
-    global groups_db
     groups_db = load_json(GROUPS_FILE)
 
     if not groups_db:
@@ -206,7 +199,7 @@ def show_owner_groups(message):
         btn = types.InlineKeyboardButton(f"📁 {title}", callback_data=f"manage_{gid}")
         markup.add(btn)
 
-    bot.send_message(message.chat.id, "📋 Як гурӯҳро барои идоракунӣ интихоб кунед:", reply_markup=markup)
+    bot.send_message(message.chat.id, "📋 Рӯйхати гурӯҳҳо. Якеро интихоб кунед:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
@@ -214,6 +207,7 @@ def callback_handler(call):
         return
 
     data = call.data
+    groups_db = load_json(GROUPS_FILE)
 
     if data.startswith("manage_"):
         gid = data.split("_")[1]
@@ -235,8 +229,6 @@ def callback_handler(call):
         )
 
     elif data == "back_to_list":
-        global groups_db
-        groups_db = load_json(GROUPS_FILE)
         markup = types.InlineKeyboardMarkup()
         for gid, title in groups_db.items():
             btn = types.InlineKeyboardButton(f"📁 {title}", callback_data=f"manage_{gid}")
@@ -244,23 +236,32 @@ def callback_handler(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text="📋 Як гурӯҳро барои идоракунӣ интихоб кунед:",
+            text="📋 Рӯйхати гурӯҳҳо. Якеро интихоб кунед:",
             reply_markup=markup
         )
 
     elif data.startswith("leave_"):
-        gid = int(data.split("_")[1])
-        group_name = groups_db.get(str(gid), "Гурӯҳ")
+        gid = data.split("_")[1]
+        group_name = groups_db.get(gid, "Гурӯҳ")
         try:
-            bot.leave_chat(gid)
+            bot.leave_chat(int(gid))
             bot.answer_callback_query(call.id, f"Бот гурӯҳи {group_name}-ро тарк кард.")
             
-            groups_db = load_json(GROUPS_FILE)
-            if str(gid) in groups_db:
-                del groups_db[str(gid)]
+            if gid in groups_db:
+                del groups_db[gid]
                 save_json(GROUPS_FILE, groups_db)
                 
-            callback_handler(types.CallbackQuery(call.id, call.from_user, call.message, "back_to_list", call.chat_instance))
+            # Навсозии рӯйхат пас аз баромадан
+            markup = types.InlineKeyboardMarkup()
+            for g_id, title in groups_db.items():
+                btn = types.InlineKeyboardButton(f"📁 {title}", callback_data=f"manage_{g_id}")
+                markup.add(btn)
+            bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text="📋 Рӯйхати гурӯҳҳо. Якеро интихоб кунед:",
+                reply_markup=markup
+            )
         except Exception as e:
             bot.send_message(call.message.chat.id, f"❌ Хатогӣ ҳангоми баромадан аз гурӯҳ: {e}")
 
@@ -284,8 +285,6 @@ def add_warning(message, reason):
     chat_id = str(message.chat.id)
     key = f"{chat_id}_{user_id}"
 
-    # ИСЛОҲ ШУД: Истифодаи дурусти load_json
-    global warnings
     warnings = load_json(WARN_FILE)
 
     if key not in warnings:
