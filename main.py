@@ -65,7 +65,7 @@ def load_data():
                 active_groups = {int(k): v for k, v in data.items()}
             print("Гурӯҳҳо аз файл бор карда шуданд.")
         except Exception as e:
-            print(f"Хатогии боркунии гурӯҳҳо: {e}")
+            print(f"Хатогӣ ҳангоми боркунии гурӯҳҳо: {e}")
 
 def save_data():
     try:
@@ -193,7 +193,6 @@ def restrict_user(chat_id, user_id, seconds):
 
 def get_bottom_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn_menu = types.KeyboardButton("🏠 ...")
     btn_menu = types.KeyboardButton("🏠 Менюи Асосӣ")
     btn_update = types.KeyboardButton("🔄 Навсозӣ (Обновить)")
     markup.row(btn_menu, btn_update)
@@ -233,7 +232,7 @@ def start_private(message):
             f"Салом, Оғои Император! 👑\n\n"
             f"Шумо соҳиби асосии бот ҳастед. Маълумоти шумо ба таври худкор сабт шуд:\n"
             f"👤 Никнейми шумо: `{MY_MAIN_ADMIN}`\n\n"
-            f"Ипоракунии бот ва гурӯҳҳо аз менюи зерин 👇"
+            f"Идоракунии бот ва гурӯҳҳо аз менюи зерин 👇"
         )
     else:
         welcome_text = (
@@ -256,7 +255,7 @@ def handle_text_buttons(message):
     user_id = message.from_user.id
     bot_info = bot.get_me()
     
-    if message.text == "🏠 ...":
+    if message.text == "🏠 Менюи Асосӣ":
         if user_id in user_states:
             del user_states[user_id]
             
@@ -269,51 +268,55 @@ def handle_text_buttons(message):
         bot.send_message(user_id, welcome_text, reply_markup=inline_markup, parse_mode="Markdown")
         
     elif message.text == "🔄 Навсозӣ (Обновить)":
-        if user_id == ADMIN_ID:
-            bot.send_message(user_id, "👑 Соҳиби асосӣ ҳамеша фаъол аст! Никнейми шумо: " + MY_MAIN_ADMIN)
+        # 1. Санҷиш: Агар пахшкунанда Соҳиби бот (Император) набошад
+        if user_id != ADMIN_ID:
+            bot.send_message(user_id, "❌ Ин тугма танҳо барои соҳиби асосии бот (Император) дастрас аст!")
             return
             
-        if user_id not in registered_admins:
-            bot.send_message(
-                user_id, 
-                "❌ Рӯйхати шумо ёфт нашуд!\n\nЛутфан, аввал аз бақайдгирии админ гузаред.",
-                reply_markup=get_start_keyboard(bot_info.username, user_id)
-            )
+        # 2. Агар Соҳиби бот пахш кунад - Оғози навсозии админҳо дар ҳама гурӯҳҳо
+        if not active_groups:
+            bot.send_message(user_id, "ℹ️ Дар база ягон гурӯҳ ёфт нашуд, ки админҳояшро навсозӣ кунам.")
             return
             
-        admin_data = registered_admins[user_id]
-        group_username = admin_data.get('group_username')
-        nickname = admin_data.get('username', '').replace("@", "").lower()
+        status_message = bot.send_message(user_id, "🔄 Лутфан интизор шавед, админҳо дар гурӯҳҳо аз нав сканер ва ҷойгир карда шуда истодаанд...")
         
-        if not group_username:
-            bot.send_message(user_id, "❌ Линки гурӯҳи шумо ёфт нашуд. Лутфан аз нав бақайдгирӣ кунед.")
-            return
-            
-        try:
-            admins = bot.get_chat_administrators(group_username)
-            user_is_admin = False
-            
-            for admin in admins:
-                if admin.user.username and admin.user.username.lower() == nickname:
-                    user_is_admin = True
-                    break
-            
-            if user_is_admin:
-                bot.send_message(user_id, f"✅ **Маълумот навсозӣ шуд (Обновлено)!**\n\nШумо то ҳол админи гурӯҳи `{group_username}` ҳастед ва бот бо никнейми шумо (`@{nickname}`) кор мекунад.")
-            else:
-                del registered_admins[user_id]
-                save_data()
-                bot.send_message(
-                    user_id, 
-                    "❌ **Санҷиш ноком шуд!**\n\nШумо дигар дар ин гурӯҳ ҳуқуқи администратор надоред ё никнейматонро иваз кардаед. Лутфан аз нав бақайдгирӣ гузаред!",
-                    reply_markup=get_start_keyboard(bot_info.username, user_id)
-                )
-        except Exception as e:
-            bot.send_message(
-                user_id, 
-                f"⚠️ **Хатогӣ ҳангоми санҷиш!**\n\nБот ба гурӯҳи `{group_username}` дастрасӣ пайдо карда натавонист. Боварӣ ҳосил кунед, ки бот дар онҷо админ аст.",
-                reply_markup=get_start_keyboard(bot_info.username, user_id)
-            )
+        updated_count = 0
+        # Сканер кардани тамоми гурӯҳҳо аз базаи groups.json
+        for gr_id, gr_title in list(active_groups.items()):
+            try:
+                # Гирифтани рӯйхати админҳои ҳақиқии гурӯҳ аз Телеграм
+                admins = bot.get_chat_administrators(gr_id)
+                for admin in admins:
+                    # Агар админи гурӯҳ бошад, никнейм дошта бошад ва худи соҳиби бот набошад
+                    if admin.user.username and admin.user.id != ADMIN_ID:
+                        admin_username = f"@{admin.user.username}"
+                        
+                        # Кӯшиши гирифтани никнейми худи гурӯҳ барои база
+                        try:
+                            chat_det = bot.get_chat(gr_id)
+                            gr_link = f"@{chat_det.username}" if chat_det.username else gr_title
+                        except Exception:
+                            gr_link = gr_title
+                            
+                        # Сабт ё навсозӣ кардани админ дар базаи admins.json
+                        registered_admins[admin.user.id] = {
+                            "username": admin_username,
+                            "group_username": gr_link
+                        }
+                        updated_count += 1
+            except Exception as e:
+                print(f"Хатогӣ ҳангоми навсозии гурӯҳи {gr_title} (ID: {gr_id}): {e}")
+                
+        # Ҳатман маълумоти навро ба файлҳо сабт мекунем
+        save_data()
+        
+        bot.edit_message_text(
+            chat_id=user_id,
+            message_id=status_message.message_id,
+            text=f"✅ **Навсозӣ бо муваффақият анҷом ёфт!**\n\n"
+                 f"📊 Ҳамагӣ `{updated_count}` админ(ҳо) дар гурӯҳҳои худ аз нав шинохта ва ҷойгир карда шуданд.\n"
+                 f"Акнун бот админҳои шуморо дар гурӯҳҳо гум намекунад! 🔥"
+        )
 
 
 # ================= СИСТЕМАИ БАҚАЙДГИРӢ =================
@@ -326,7 +329,7 @@ def callback_inline(call):
     
     if call.data == "register_username_step":
         if user_id == ADMIN_ID:
-            bot.answer_callback_query(call.id, "👑 inline_markup", show_alert=True)
+            bot.answer_callback_query(call.id, "👑 Шумо соҳиби бот ҳастед, бақайдгирӣ шарт нест!", show_alert=True)
             return
             
         user_states[user_id] = {"step": "waiting_for_username"}
@@ -495,7 +498,6 @@ def callback_inline(call):
 
 # ================= ҚАДАМҲОИ ВОРУД КАРДАНИ МАЪЛУМОТИ МАТНИИ БАҚАЙДГИРӢ =================
 
-
 @bot.message_handler(func=lambda message: message.from_user.id in user_states, chat_types=['private'])
 def registration_text_inputs(message):
     user_id = message.from_user.id
@@ -593,7 +595,7 @@ def registration_text_inputs(message):
 
 # ==============================================================================
 
-# МУҲИМТАРИН ТАҒЙИРОТ: Рӯйхати пурраи намуди медиа-паёмҳо ба ороишгар (декоратор) илова шуд!
+# ФИЛТРИ ПАЁМҲО ВА ТОЗА КАРДАНИ НАВИШТАҶОТИ ТАГИ РАСМ ВА ВИДЕО
 @bot.message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice', 'sticker', 'animation', 'video_note'])
 def filter_messages(message):
     chat_id = message.chat.id
@@ -684,7 +686,6 @@ def filter_messages(message):
             elif user_link_warnings[user_id] == 2:
                 bot.send_message(
                     chat_id, 
-                    f"⚠️ ...",
                     f"⚠️ Корбар {user_name}, бори дуюм аст ки огохи гирифтед! Огоҳии охирин: (2/3)"
                 )
             elif user_link_warnings[user_id] >= 3:
@@ -718,7 +719,7 @@ def filter_messages(message):
                 try:
                     bot.send_message(ADMIN_ID, report_message, parse_mode="HTML")
                 except Exception as send_err:
-                    print(f"Хатогӣ ҳангоми фиристодани отчёт ба админ: {send_err}")
+                    print(f"Хатогӣ ҳангоми фиристодани отчёт ба admin: {send_err}")
 
                 if user_id not in user_badword_warnings:
                     user_badword_warnings[user_id] = 0
@@ -852,7 +853,6 @@ def filter_edited_messages(message):
                     restrict_user(chat_id, user_id, 28800)
                     bot.send_message(
                         chat_id,
-                        f"🚫 ...",
                         f"🚫 Корбар {user_name} \n барои истифодаи дашном (ҳангоми таҳрир) ба муҳлати 8 соат блок шуд!"
                     )
                     user_badword_warnings[user_id] = 0
