@@ -140,14 +140,24 @@ def delete_left_member_message(message):
         print(f"Хатогии нест кардани паёми баромадан: {e}")
 
 # ==========================================
-# МЕНЮИ ЛИЧКАИ БОТ (ИДОРАКУНИИ ТУГМАҲО)
+# МЕНЮИ ЛИЧКАИ БОТ (ИҶРОИ ТОЗАКОРӢ)
 # ==========================================
 @bot.message_handler(commands=["start"])
 def start(message):
     if message.chat.type != "private":
         return
 
-    # Ислоҳ шуд: Акнун тугмаҳои изофӣ нест карда шуданд
+    # ҚАДАМИ 1: Маҷбуран тоза кардани тамоми тугмаҳои кӯҳнаи экран
+    msg_clear = bot.send_message(
+        message.chat.id, 
+        "🔄 Танзимоти тугмаҳо навсозӣ шуда истодааст...", 
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+    
+    # Як сония интизор мешавем, то Телеграм тугмаҳоро тоза кунад
+    time.sleep(1)
+    
+    # ҚАДАМИ 2: Сохтани тугмаҳои нави тоза
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn_add = types.KeyboardButton("➕ Илова ба гурӯҳ")
     markup.add(btn_add)
@@ -156,10 +166,12 @@ def start(message):
         btn_groups = types.KeyboardButton("👑 Гурӯҳҳои пайвастшуда")
         markup.add(btn_groups)
 
+    # ҚАДАМИ 3: Фиристодани паёми асосӣ бо тугмаҳои нав
     bot.send_message(
         message.chat.id,
         f"Салом, {message.from_user.first_name}! 🤖\n\n"
-        "Ман боти назоратчии гурӯҳ ҳастам. Лутфан тугмаи дилхоҳро пахш кунед 👇",
+        "Интерфейси бот бомуваффақият навсозӣ шуд ва тугмаҳои иловагӣ тоза карда шуданд. "
+        "Лутфан тугмаи дилхоҳро пахш кунед 👇",
         reply_markup=markup
     )
 
