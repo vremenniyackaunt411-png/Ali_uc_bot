@@ -55,8 +55,19 @@ BAD_WORDS = [
 def load_answers():
     if os.path.exists(FILE_ANSWERS):
         with open(FILE_ANSWERS, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}  # Базаи холӣ, ки худаш бо усули Reply пур мешавад
+            try:
+                data = json.load(f)
+                # Табдили ҷавобҳои кӯҳна (сатр) ба рӯйхат (list) барои мутобиқат бо Multi-Reply
+                for chat_id in data:
+                    if isinstance(data[chat_id], dict):
+                        for question in data[chat_id]:
+                            if isinstance(data[chat_id][question], str):
+                                data[chat_id][question] = [data[chat_id][question]]
+                return data
+            except Exception as e:
+                print(f"Хатогӣ ҳангоми боркунии базаи саволҳо: {e}")
+                return {}
+    return {}
 
 # Сабти базаи саволу ҷавобҳо
 def save_answers():
@@ -66,14 +77,17 @@ def save_answers():
 def load_groups():
     if os.path.exists(FILE_GROUPS):
         with open(FILE_GROUPS, "r", encoding="utf-8") as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except:
+                return {}
     return {}
 
 def save_groups(groups_dict):
     with open(FILE_GROUPS, "w", encoding="utf-8") as f:
         json.dump(groups_dict, f, ensure_ascii=False, indent=4)
 
-# Боркунии база (сохтор: {"chat_id": {"савол": "ҷавоб"}})
+# Боркунии база (сохтор: {"chat_id": {"савол": ["ҷавоб1", "ҷавоб2"]}})
 ANSWERS = load_answers()
 
 BOT_USERNAME = None
@@ -164,7 +178,8 @@ def send_main_menu(chat_id, user_id):
 
     if user_id == ADMIN_ID:
         btn_admin = telebot.types.InlineKeyboardButton("📊 Гурӯҳҳои васлшуда", callback_data="admin_groups")
-        markup.add(btn_admin)
+        btn_refresh = telebot.types.InlineKeyboardButton("🔄 Навсозии гурӯҳҳо", callback_data="admin_refresh_groups")
+        markup.add(btn_admin, btn_refresh)
 
     welcome_text = (
         "<b>Салом! Хуш омадед ба боти муҳофиз! 👋🤖</b>\n\n"
@@ -235,11 +250,57 @@ def callback_inline(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text="📋 <b>Гурӯҳҳое, ки бот дар онҳо васл аст:</b>\n<i>Якеро барои идоракунӣ ва фиристодани паём интихоб кунед:</i>",
+            text="📋 <b>Гурӯҳҳое, ки бот дар онҳо васл аст:</b>\n<i>Якеро барои ипоракунӣ ва фиристодани паём интихоб кунед:</i>",
             parse_mode="HTML",
             reply_markup=markup
         )
         bot.answer_callback_query(call.id)
+
+    elif call.data == "admin_refresh_groups":
+        bot.answer_callback_query(call.id, "Лутфан мунтазир шавед, гурӯҳҳо санҷида мешаванд... 🔄", show_alert=False)
+        groups = load_groups()
+        updated_groups = {}
+        removed_count = 0
+        kept_count = 0
+        
+        try:
+            bot_id = bot.get_me().id
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"Хатогӣ дар пайвастшавӣ: {e}", show_alert=True)
+            return
+
+        for g_id, g_name in list(groups.items()):
+            try:
+                # Санҷиши ҳузури бот дар гурӯҳ
+                member = bot.get_chat_member(int(g_id), bot_id)
+                if member.status in ['left', 'kicked']:
+                    removed_count += 1
+                else:
+                    # Навсозии номи гурӯҳ дар ҳолати тағйир ёфтан
+                    chat_info = bot.get_chat(int(g_id))
+                    updated_groups[str(g_id)] = chat_info.title if chat_info.title else g_name
+                    kept_count += 1
+            except Exception:
+                # Агар хатогӣ диҳад (кик шудан, ё гурӯҳ нест шуда бошад)
+                removed_count += 1
+
+        save_groups(updated_groups)
+        
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu"))
+        
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=(
+                f"🔄 <b>Навсозии гурӯҳҳо ба охир расид!</b>\n\n"
+                f"✅ Гурӯҳҳои фаъол: <b>{kept_count}</b>\n"
+                f"❌ Хориҷшуда/Нестшуда: <b>{removed_count}</b>\n\n"
+                f"<i>Маълумоти базаи шумо бо муваффақият тоза ва нав карда шуд!</i>"
+            ),
+            parse_mode="HTML",
+            reply_markup=markup
+        )
 
     elif call.data.startswith("admin_view_group_"):
         group_id = call.data.replace("admin_view_group_", "")
@@ -470,7 +531,7 @@ def chat(message):
             return
 
     # ==========================================
-    # СИСТЕМАИ НАВИ АВТО-ОМӮЗИШ (REPLY LEARN)
+    # СИСТЕМАИ НАВИ АВТО-ОМӮЗИШ (REPLY MULTI-LEARN)
     # ==========================================
     if message.chat.type in ['group', 'supergroup'] and message.content_type == 'text':
         text_clean = message.text.strip().lower()
@@ -485,26 +546,41 @@ def chat(message):
                 if chat_id not in ANSWERS:
                     ANSWERS[chat_id] = {}
                 
-                # Сабти худкор ба базаи ҳамин чат
-                ANSWERS[chat_id][savol] = javob
-                save_answers()
-                print(f"[Умумии Чат {chat_id}] Омӯхта шуд: {savol} -> {javob}")
+                # Сохтани сохтори рӯйхат (List) барои якчанд ҷавобҳо
+                if savol not in ANSWERS[chat_id]:
+                    ANSWERS[chat_id][savol] = []
+                elif isinstance(ANSWERS[chat_id][savol], str):
+                    ANSWERS[chat_id][savol] = [ANSWERS[chat_id][savol]]
+                
+                # Танҳо агар ҷавоби нав дар рӯйхат набошад, онро илова мекунем
+                if javob not in ANSWERS[chat_id][savol]:
+                    ANSWERS[chat_id][savol].append(javob)
+                    save_answers()
+                    print(f"[Умумии Чат {chat_id}] Омӯхта шуд: {savol} -> {javob}")
                 return
 
-        # Б) ҶАВОБДИҲИИ АВТОМАТӢ: Агар касе паёме нависад, ки дар базаи ин чат ҳаст
+        # Б) ҶАВОБДИҲИИ АВТОМАТӢ: Бо интихоби тасодуфии яке аз ҷавобҳо (Random Choice)
         if chat_id in ANSWERS:
-            # Аввал ҷустуҷӯ мекунем, ки оё ин паём дақиқ ҳамчун калиди савол сабт шудааст
+            # Агар калиди дақиқ ёфт шавад
             if text_clean in ANSWERS[chat_id]:
-                auto_reply_text = ANSWERS[chat_id][text_clean]
-                bot.reply_to(message, auto_reply_text)
-                return
+                replies = ANSWERS[chat_id][text_clean]
+                if isinstance(replies, str):
+                    replies = [replies]
+                if replies:
+                    auto_reply_text = random.choice(replies)
+                    bot.reply_to(message, auto_reply_text)
+                    return
             
             # Агар дақиқ мувофиқат накунад, санҷиши калима ба калима дар матни саволҳо
             words = text_clean.split()
-            for question, answer in ANSWERS[chat_id].items():
+            for question, replies in ANSWERS[chat_id].items():
                 if question in words:
-                    bot.reply_to(message, answer)
-                    break
+                    if isinstance(replies, str):
+                        replies = [replies]
+                    if replies:
+                        auto_reply_text = random.choice(replies)
+                        bot.reply_to(message, auto_reply_text)
+                        break
 
 # ==========================================
 # 8. ОҒОЗИ КОР ВА БОТ ПОЛЛИНГ
