@@ -494,7 +494,7 @@ def chat(message):
         # Б) ҶАВОБДИҲИИ АВТОМАТӢ: Агар касе паёме нависад, ки дар базаи ин чат ҳаст
         if chat_id in ANSWERS:
             # Аввал ҷустуҷӯ мекунем, ки оё ин паём дақиқ ҳамчун калиди савол сабт шудааст
-          if text_clean in ANSWERS[chat_id]:
+            if text_clean in ANSWERS[chat_id]:
                 auto_reply_text = ANSWERS[chat_id][text_clean]
                 bot.reply_to(message, auto_reply_text)
                 return
