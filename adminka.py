@@ -78,7 +78,10 @@ def load_groups():
     if os.path.exists(FILE_GROUPS):
         with open(FILE_GROUPS, "r", encoding="utf-8") as f:
             try:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                return {}
             except:
                 return {}
     return {}
@@ -250,7 +253,7 @@ def callback_inline(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text="📋 <b>Гурӯҳҳое, ки бот дар онҳо васл аст:</b>\n<i>Якеро барои ипоракунӣ ва фиристодани паём интихоб кунед:</i>",
+            text="📋 <b>Гурӯҳҳое, ки бот дар онҳо васл аст:</b>\n<i>Якеро барои идоракунӣ ва фиристодани паём интихоб кунед:</i>",
             parse_mode="HTML",
             reply_markup=markup
         )
@@ -437,6 +440,7 @@ def chat(message):
                 bot.send_message(chat_id, f"❌ Хатогӣ ҳангоми фиристодани паём ба гурӯҳ: {e}")
             return
 
+    # ҲАТМАН САБТ КАРДАНИ ГУРӮҲ ҲАТТО АГАР ЯГОН ПАЁМИ ОДДӢ ОМАД
     if message.chat.type in ['group', 'supergroup']:
         groups = load_groups()
         if chat_id not in groups:
