@@ -3,8 +3,8 @@ import re
 import json
 import time
 import random
-import threading  # Илова шуд барои Flask
-from flask import Flask  # Илова шуд барои Flask
+import threading
+from flask import Flask
 import telebot
 
 # ==========================================
@@ -17,7 +17,6 @@ def home():
     return "Бот фаъол аст ва 24/7 кор мекунад!", 200
 
 def run_web_server():
-    # Render ба таври худкор тағйирёбандаи PORT-ро медиҳад, агар набошад 8080-ро мегирад
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
@@ -29,6 +28,7 @@ def keep_alive():
 # ==========================================
 # 2. ТАНЗИМ ВА БОТИ ТЕЛЕГРАМ
 # ==========================================
+# ⚠️ ДИҚҚАТ: Токени худро барои хавфнокии хакерҳо иваз кунед!
 TOKEN = "8685830202:AAEulXqhwGLY0p9N-saKSCBgcjfmM0UtWIU"
 
 # ИД-И ТЕЛЕГРАМИ ХУДАТОН (Соҳиби бот)
@@ -38,10 +38,11 @@ bot = telebot.TeleBot(TOKEN)
 FILE_ANSWERS = "answers.json"
 FILE_GROUPS = "groups.json"
 
-# Махзани огоҳиҳо (Алоҳида барои дашном ва спам)
-user_warnings = {}
+# Вақти нигоҳдории саволу ҷавобҳо: 7 рӯз (бо сония)
+CLEANUP_INTERVAL_SECONDS = 7 * 24 * 3600
 
-# Барои муваққатӣ нигоҳ доштани ҳолати фиристодани паём аз ҷониби админ
+# Махзани огоҳиҳо ва ҳолати админ
+user_warnings = {}
 admin_states = {}
 
 # РӮЙХАТИ КАЛИМАҲОИ НОҶО ВА СПАМӢ БАРОИ ТОЗА КАРДАН
@@ -51,19 +52,40 @@ BAD_WORDS = [
     'мегом', 'керм', 'мехарм', 'мехарам', 'гойда'
 ]
 
-# Боргузории базаи саволу ҷавобҳои автоматӣ
+# Тоза кардани саволу ҷавобҳои аз 7 рӯз кӯҳна
+def cleanup_old_answers(data):
+    current_time = time.time()
+    cleaned_data = {}
+    
+    for key, questions in data.items():
+        cleaned_questions = {}
+        for q, responses in questions.items():
+            valid_responses = []
+            if isinstance(responses, list):
+                for item in responses:
+                    # Агар сохтор бо вақт бошад: {"text": "ҷавоб", "time": 123456}
+                    if isinstance(item, dict) and "text" in item and "time" in item:
+                        if current_time - item["time"] <= CLEANUP_INTERVAL_SECONDS:
+                            valid_responses.append(item)
+                    # Агар маълумоти кӯҳна (оддӣ) бошад, онро бо вақти ҳозира мутобиқ мекунем
+                    elif isinstance(item, str):
+                        valid_responses.append({"text": item, "time": current_time})
+            cleaned_questions[q] = valid_responses
+        
+        # Танҳо саволҳоеро нигоҳ медорем, ки ҷавоб доранд
+        cleaned_questions = {q: resp for q, resp in cleaned_questions.items() if resp}
+        if cleaned_questions:
+            cleaned_data[key] = cleaned_questions
+            
+    return cleaned_data
+
+# Боргузории базаи саволу ҷавобҳо
 def load_answers():
     if os.path.exists(FILE_ANSWERS):
         with open(FILE_ANSWERS, "r", encoding="utf-8") as f:
             try:
                 data = json.load(f)
-                # Табдили ҷавобҳои кӯҳна (сатр) ба рӯйхат (list) барои мутобиқат бо Multi-Reply
-                for chat_id in data:
-                    if isinstance(data[chat_id], dict):
-                        for question in data[chat_id]:
-                            if isinstance(data[chat_id][question], str):
-                                data[chat_id][question] = [data[chat_id][question]]
-                return data
+                return cleanup_old_answers(data)
             except Exception as e:
                 print(f"Хатогӣ ҳангоми боркунии базаи саволҳо: {e}")
                 return {}
@@ -90,7 +112,7 @@ def save_groups(groups_dict):
     with open(FILE_GROUPS, "w", encoding="utf-8") as f:
         json.dump(groups_dict, f, ensure_ascii=False, indent=4)
 
-# Боркунии база (сохтор: {"chat_id": {"савол": ["ҷавоб1", "ҷавоб2"]}})
+# Боркунии база
 ANSWERS = load_answers()
 
 BOT_USERNAME = None
@@ -99,20 +121,17 @@ try:
 except Exception as e:
     print(f"Хатогӣ ҳангоми гирифтани номи бот: {e}")
 
-# Функсияи тоза кардани аломатҳои HTML
 def escape_html(text):
     if not text:
         return ""
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-# Фиристодани паём ба соҳиби бот
 def send_to_owner(text):
     try:
         bot.send_message(ADMIN_ID, text, parse_mode="HTML")
     except Exception as e:
         print(f"⚠️ Хатогӣ ҳангоми фиристодани паём ба соҳиби бот: {e}")
 
-# Санҷидани админ будани корбар
 def is_user_admin(chat_id, user_id, sender_chat=None):
     if sender_chat and sender_chat.id == chat_id:
         return True
@@ -126,7 +145,6 @@ def is_user_admin(chat_id, user_id, sender_chat=None):
         print(f"⚠️ Хатогӣ ҳангоми санҷиши ҳуқуқи админии корбар {user_id}: {e}")
     return False
 
-# Санҷиши калимаҳои ноҷо
 def has_bad_words(text):
     text_lower = text.lower()
     for word in BAD_WORDS:
@@ -141,16 +159,13 @@ def has_bad_words(text):
                 return True
     return False
 
-# Санҷиши линкҳо
 def has_link(text):
     link_pattern = r"(https?://\S+|www\.\S+|t\.me/\S+|telegram\.me/\S+|\w+\.tj\b|\w+\.ru\b|\w+\.com\b|\w+\.org\b|\w+\.net\b)"
     return bool(re.search(link_pattern, text))
 
-# Санҷиши никнеймҳо
 def has_username(text):
     return bool(re.search(r"@\w+", text))
 
-# Маҳдудсозӣ (Mute)
 def restrict_user(chat_id, user_id, hours):
     until_date = int(time.time()) + (hours * 3600)
     permissions = telebot.types.ChatPermissions(
@@ -274,17 +289,14 @@ def callback_inline(call):
 
         for g_id, g_name in list(groups.items()):
             try:
-                # Санҷиши ҳузури бот дар гурӯҳ
                 member = bot.get_chat_member(int(g_id), bot_id)
                 if member.status in ['left', 'kicked']:
                     removed_count += 1
                 else:
-                    # Навсозии номи гурӯҳ дар ҳолати тағйир ёфтан
                     chat_info = bot.get_chat(int(g_id))
                     updated_groups[str(g_id)] = chat_info.title if chat_info.title else g_name
                     kept_count += 1
             except Exception:
-                # Агар хатогӣ диҳад (кик шудан, ё гурӯҳ нест шуда бошад)
                 removed_count += 1
 
         save_groups(updated_groups)
@@ -388,7 +400,6 @@ def delete_left_member_message(message):
     except Exception as e:
         print(f"Хатогӣ ҳангоми нест кардани паёми баромад: {e}")
 
-# Сӯҳбат ва матни ошкоршуда
 def get_message_text(message):
     if message.text:
         return message.text.lower()
@@ -401,12 +412,12 @@ def get_message_text(message):
 # ==========================================
 @bot.message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice'])
 def chat(message):
-    chat_id = str(message.chat.id)  # ID-и гурӯҳро ба намуди сатр истифода мебарем
+    global ANSWERS
+    chat_id = str(message.chat.id)
     user_id = message.from_user.id if message.from_user else None
     chat_title = message.chat.title or "Гурӯҳ"
     sender_chat = message.sender_chat
 
-    # Муайян кардани номи корбар
     if message.from_user:
         user_name = message.from_user.first_name if message.from_user.first_name else "Корбар"
         user_username = f"@{message.from_user.username}" if message.from_user.username else "Никнейм надорад"
@@ -414,9 +425,7 @@ def chat(message):
         user_name = "Канал / Чат"
         user_username = "Аноним"
 
-    # ==========================================
-    # КОР КАРДАН БО ФИРИСТОДАНИ ПАЁМИ АДМИН (ЛС)
-    # ==========================================
+    # 1. ПАЁМИ АДМИН АЗ ЛС
     if message.chat.type == 'private' and user_id == ADMIN_ID:
         if user_id in admin_states and admin_states[user_id].get("action") == "wait_message":
             group_id = admin_states[user_id]["group_id"]
@@ -440,7 +449,7 @@ def chat(message):
                 bot.send_message(chat_id, f"❌ Хатогӣ ҳангоми фиристодани паём ба гурӯҳ: {e}")
             return
 
-    # ҲАТМАН САБТ КАРДАНИ ГУРӮҲ ҲАТТО АГАР ЯГОН ПАЁМИ ОДДӢ ОМАД
+    # САБТИ ГУРӮҲ
     if message.chat.type in ['group', 'supergroup']:
         groups = load_groups()
         if chat_id not in groups:
@@ -448,18 +457,13 @@ def chat(message):
             save_groups(groups)
 
     msg_text = get_message_text(message)
-
-    # 1. САНҶИШИ АДМИН БУДАН
     is_admin = is_user_admin(message.chat.id, user_id, sender_chat)
 
-    # ==========================================
-    # КОРҲОИ АНТИСПАМ ВА АНТИДАШНОМ (БАРОИ КОРБАРОНИ ОДДӢ)
-    # ==========================================
+    # 2. АНТИСПАМ ВА АНТИДАШНОМ
     if not is_admin and user_id:
         if user_id not in user_warnings:
             user_warnings[user_id] = {"bad_words": 0, "spam": 0}
 
-        # А) САНҶИШИ КАЛИМАҲОИ НОҶО
         if has_bad_words(msg_text):
             if message.chat.type in ['group', 'supergroup']:
                 try:
@@ -495,7 +499,6 @@ def chat(message):
                     print(f"❌ Хатогӣ ҳангоми ҷаримаи калимаи ноҷо: {e}")
             return
 
-        # Б) САНҶИШИ РЕКЛАМА ВА ССЫЛКАҲО
         is_forwarded = message.forward_from or message.forward_from_chat or message.forward_sender_name
         if has_link(msg_text) or has_username(msg_text) or is_forwarded:
             if message.chat.type in ['group', 'supergroup']:
@@ -535,66 +538,63 @@ def chat(message):
             return
 
     # ==========================================
-    # СИСТЕМАИ НАВИ АВТО-ОМӮЗИШ (REPLY MULTI-LEARN)
+    # 3. СИСТЕМАИ НАВИ АВТО-ОМӮЗИШ ВА ҲАМСӮҲБАТӢ (1-ҲАФТАИНА)
     # ==========================================
     if message.chat.type in ['group', 'supergroup'] and message.content_type == 'text':
         text_clean = message.text.strip().lower()
+        now = time.time()
 
-        # А) ЁДГИРӢ: Агар паём ҷавоб (Reply) ба паёми дигар бошад
+        # Тоза кардани саволу ҷавобҳои аз 7 рӯз кӯҳна
+        ANSWERS = cleanup_old_answers(ANSWERS)
+
+        # А) Агар паём ҷавоб (Reply) ба паёми дигар бошад -> САБТ МАКУНЕД
         if message.reply_to_message and message.reply_to_message.text:
-            savol = message.reply_to_message.text.strip().lower()  # Паёми аввала (савол)
-            javob = message.text.strip()  # Паёми навиштаи ҳозира (ҷавоб)
+            savol = message.reply_to_message.text.strip().lower()
+            javob = message.text.strip()
 
-            # Шартҳо барои пешгирӣ аз сабти линк ё дашном ҳамчун ҷавоб
             if len(savol) > 1 and javob and not has_bad_words(javob) and not has_link(javob):
-                if chat_id not in ANSWERS:
-                    ANSWERS[chat_id] = {}
-                
-                # Сохтани сохтори рӯйхат (List) барои якчанд ҷавобҳо
-                if savol not in ANSWERS[chat_id]:
-                    ANSWERS[chat_id][savol] = []
-                elif isinstance(ANSWERS[chat_id][savol], str):
-                    ANSWERS[chat_id][savol] = [ANSWERS[chat_id][savol]]
-                
-                # Танҳо агар ҷавоби нав дар рӯйхат набошад, онро илова мекунем
-                if javob not in ANSWERS[chat_id][savol]:
-                    ANSWERS[chat_id][savol].append(javob)
-                    save_answers()
-                    print(f"[Умумии Чат {chat_id}] Омӯхта шуд: {savol} -> {javob}")
-                return
+                global_key = "GLOBAL"
+                if global_key not in ANSWERS:
+                    ANSWERS[global_key] = {}
 
-        # Б) ҶАВОБДИҲИИ АВТОМАТӢ: Бо интихоби тасодуфии яке аз ҷавобҳо (Random Choice)
-        if chat_id in ANSWERS:
-            # Агар калиди дақиқ ёфт шавад
-            if text_clean in ANSWERS[chat_id]:
-                replies = ANSWERS[chat_id][text_clean]
-                if isinstance(replies, str):
-                    replies = [replies]
-                if replies:
-                    auto_reply_text = random.choice(replies)
-                    bot.reply_to(message, auto_reply_text)
-                    return
-            
-            # Агар дақиқ мувофиқат накунад, санҷиши калима ба калима дар матни саволҳо
-            words = text_clean.split()
-            for question, replies in ANSWERS[chat_id].items():
-                if question in words:
-                    if isinstance(replies, str):
-                        replies = [replies]
-                    if replies:
-                        auto_reply_text = random.choice(replies)
-                        bot.reply_to(message, auto_reply_text)
-                        break
+                if savol not in ANSWERS[global_key]:
+                    ANSWERS[global_key][savol] = []
+
+                # Санҷиши такрор нашудани як ҷавоб
+                existing_texts = [item["text"] for item in ANSWERS[global_key][savol] if isinstance(item, dict)]
+                if javob not in existing_texts:
+                    ANSWERS[global_key][savol].append({"text": javob, "time": now})
+                    save_answers()
+                    print(f"[Базаи Умумӣ] Сабт шуд: '{savol}' -> '{javob}'")
+
+        # Б) ҶАВОБДИҲИИ АВТОМАТӢ (Random аз ҷавобҳои 7 рӯзи охир)
+        if "GLOBAL" in ANSWERS and ANSWERS["GLOBAL"]:
+            responses_pool = []
+
+            # 1. Санҷиши мувофиқати дақиқ
+            if text_clean in ANSWERS["GLOBAL"]:
+                responses_pool = [item["text"] for item in ANSWERS["GLOBAL"][text_clean] if isinstance(item, dict)]
+
+            # 2. Агар мувофиқати дақиқ набошад, ҷӯстуҷӯ дар даруни матн
+            if not responses_pool:
+                for q, resp_list in ANSWERS["GLOBAL"].items():
+                    if q in text_clean:
+                        responses_pool = [item["text"] for item in resp_list if isinstance(item, dict)]
+                        if responses_pool:
+                            break
+
+            # 3. Агар ҷавобҳо ёфт шаванд, тасодуфӣ (Random) якеро интихоб намуда reply мекунем
+            if responses_pool:
+                chosen_reply = random.choice(responses_pool)
+                bot.reply_to(message, chosen_reply)
 
 # ==========================================
 # 8. ОҒОЗИ КОР ВА БОТ ПОЛЛИНГ
 # ==========================================
 if __name__ == '__main__':
-    # Flask-ро дар замина фаъол мекунем
     keep_alive()
     print("Веб-сервер бомуваффақият фаъол шуд!")
     
-    # Корро оғоз кардани худи бот
     while True:
         try:
             print("Бот фаъол шуд ва ба кор омода аст...")
