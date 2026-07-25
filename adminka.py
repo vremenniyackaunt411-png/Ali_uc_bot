@@ -537,56 +537,57 @@ def chat(message):
                     print(f"❌ Хатогӣ ҳангоми ҷаримаи спам: {e}")
             return
 
-    # ==========================================
-    # 3. СИСТЕМАИ НАВИ АВТО-ОМӮЗИШ ВА ҲАМСӮҲБАТӢ (1-ҲАФТАИНА)
-    # ==========================================
-    if message.chat.type in ['group', 'supergroup'] and message.content_type == 'text':
-        text_clean = message.text.strip().lower()
-        now = time.time()
+            # ==========================================
+        # 3. СИСТЕМАИ НАВИ АВТО-ОМӮЗИШ ВА ҲАМСӮҲБАТӢ (1-ҲАФТАИНА)
+        # ==========================================
+        if message.chat.type in ['group', 'supergroup'] and message.content_type == 'text':
+            text_clean = message.text.strip().lower()
+            now = time.time()
 
-        # Тоза кардани саволу ҷавобҳои аз 7 рӯз кӯҳна
-        ANSWERS = cleanup_old_answers(ANSWERS)
+            # Тоза кардани саволу ҷавобҳои аз 7 рӯз кӯҳна
+            ANSWERS = cleanup_old_answers(ANSWERS)
 
-        # А) Агар паём ҷавоб (Reply) ба паёми дигар бошад -> САБТ МАКУНЕД
-        if message.reply_to_message and message.reply_to_message.text:
-            savol = message.reply_to_message.text.strip().lower()
-            javob = message.text.strip()
+            # А) Агар паём ҷавоб (Reply) ба паёми дигар бошад -> САБТ КАРДАН
+            if message.reply_to_message and message.reply_to_message.text:
+                savol = message.reply_to_message.text.strip().lower()
+                javob = message.text.strip()
 
-            if len(savol) > 1 and javob and not has_bad_words(javob) and not has_link(javob):
-                global_key = "GLOBAL"
-                if global_key not in ANSWERS:
-                    ANSWERS[global_key] = {}
+                if len(savol) > 1 and javob and not has_bad_words(javob) and not has_link(javob):
+                    global_key = "GLOBAL"
+                    if global_key not in ANSWERS:
+                        ANSWERS[global_key] = {}
 
-                if savol not in ANSWERS[global_key]:
-                    ANSWERS[global_key][savol] = []
+                    if savol not in ANSWERS[global_key]:
+                        ANSWERS[global_key][savol] = []
 
-                # Санҷиши такрор нашудани як ҷавоб
-                existing_texts = [item["text"] for item in ANSWERS[global_key][savol] if isinstance(item, dict)]
-                if javob not in existing_texts:
-                    ANSWERS[global_key][savol].append({"text": javob, "time": now})
-                    save_answers()
-                    print(f"[Базаи Умумӣ] Сабт шуд: '{savol}' -> '{javob}'")
+                    # Санҷиши такрор нашудани як ҷавоб
+                    existing_texts = [item["text"] for item in ANSWERS[global_key][savol] if isinstance(item, dict)]
+                    if javob not in existing_texts:
+                        ANSWERS[global_key][savol].append({"text": javob, "time": now})
+                        save_answers()
+                        print(f"[Базаи Умумӣ] Сабт шуд: '{savol}' -> '{javob}'")
 
-        # Б) ҶАВОБДИҲИИ АВТОМАТӢ (Random аз ҷавобҳои 7 рӯзи охир)
-        if "GLOBAL" in ANSWERS and ANSWERS["GLOBAL"]:
-            responses_pool = []
+            # Б) ҶАВОБДИҲИИ АВТОМАТӢ (Беҳтаршуда ва боэътимод)
+            if "GLOBAL" in ANSWERS and ANSWERS["GLOBAL"]:
+                responses_pool = []
 
-            # 1. Санҷиши мувофиқати дақиқ
-            if text_clean in ANSWERS["GLOBAL"]:
-                responses_pool = [item["text"] for item in ANSWERS["GLOBAL"][text_clean] if isinstance(item, dict)]
+                # 1. Санҷиши мувофиқати дақиқ
+                if text_clean in ANSWERS["GLOBAL"]:
+                    responses_pool = [item["text"] for item in ANSWERS["GLOBAL"][text_clean] if isinstance(item, dict)]
 
-            # 2. Агар мувофиқати дақиқ набошад, ҷӯстуҷӯ дар даруни матн
-            if not responses_pool:
-                for q, resp_list in ANSWERS["GLOBAL"].items():
-                    if q in text_clean:
-                        responses_pool = [item["text"] for item in resp_list if isinstance(item, dict)]
-                        if responses_pool:
-                            break
+                # 2. Санҷиши калима ба калима (агар калимаи асосии савол дар ҷумла бошад)
+                if not responses_pool:
+                    for q, resp_list in ANSWERS["GLOBAL"].items():
+                        if q in text_clean or text_clean in q:
+                            responses_pool = [item["text"] for item in resp_list if isinstance(item, dict)]
+                            if responses_pool:
+                                break
 
-            # 3. Агар ҷавобҳо ёфт шаванд, тасодуфӣ (Random) якеро интихоб намуда reply мекунем
-            if responses_pool:
-                chosen_reply = random.choice(responses_pool)
-                bot.reply_to(message, chosen_reply)
+                # 3. Агар ҷавобҳо ёфт шаванд, тасодуфӣ (Random) якеро интихоб мекунем
+                if responses_pool:
+                    chosen_reply = random.choice(responses_pool)
+                    bot.reply_to(message, chosen_reply)
+                    return
 
 # ==========================================
 # 8. ОҒОЗИ КОР ВА БОТ ПОЛЛИНГ
