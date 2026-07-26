@@ -28,7 +28,7 @@ def keep_alive():
 # ==========================================
 # 2. ТАНЗИМ ВА БОТИ ТЕЛЕГРАМ
 # ==========================================
-TOKEN = "8685830202:AAEulXqhwGLY0p9N-saKSCBgcjfmM0UtWIU"
+TOKEN = os.environ.get("BOT_TOKEN", "8685830202:AAEulXqhwGLY0p9N-saKSCBgcjfmM0UtWIU")
 ADMIN_ID = 6871575684
 
 bot = telebot.TeleBot(TOKEN)
@@ -47,6 +47,9 @@ BAD_WORDS = [
     'мегом', 'керм', 'мехарм', 'мехарам', 'гойда'
 ]
 
+# ==========================================
+# 3. ТОЗАИ НАВШУДАИ БАЗА (2 ИСТИФОДА Ё 7 РӮЗ)
+# ==========================================
 def cleanup_old_answers(data):
     current_time = time.time()
     cleaned_data = {}
@@ -58,10 +61,16 @@ def cleanup_old_answers(data):
             if isinstance(responses, list):
                 for item in responses:
                     if isinstance(item, dict) and "text" in item and "time" in item:
-                        if current_time - item["time"] <= CLEANUP_INTERVAL_SECONDS:
+                        use_count = item.get("use_count", 0)
+                        is_expired = (current_time - item["time"]) > CLEANUP_INTERVAL_SECONDS
+                        
+                        # Агар камтар аз 2 бор истифода шуда бошад ва аз 7 рӯз кӯҳна нашуда бошад
+                        if use_count < 2 and not is_expired:
                             valid_responses.append(item)
                     elif isinstance(item, str):
-                        valid_responses.append({"text": item, "time": current_time})
+                        # Барои поддежкаи формати кӯҳна
+                        valid_responses.append({"text": item, "time": current_time, "use_count": 0})
+            
             cleaned_questions[q] = valid_responses
         
         cleaned_questions = {q: resp for q, resp in cleaned_questions.items() if resp}
@@ -167,7 +176,7 @@ def restrict_user(chat_id, user_id, hours):
     bot.restrict_chat_member(chat_id, user_id, until_date=until_date, permissions=permissions)
 
 # ==========================================
-# МЕНЮИ АСОСӢ (БАРОИ ЛС - ЧАТИ БОТ)
+# 4. МЕНЮИ АСОСӢ (БАРОИ ЛС - ЧАТИ БОТ)
 # ==========================================
 def send_main_menu(chat_id, user_id):
     global BOT_USERNAME
@@ -221,7 +230,7 @@ def start(message):
     send_main_menu(message.chat.id, user_id)
 
 # ==========================================
-# ИДОРАКУНИИ CALLBACK-ҲО (ТУГМАҲОИ INLINE)
+# 5. ИДОРАКУНИИ CALLBACK-ҲО (ТУГМАҲОИ INLINE)
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
@@ -345,7 +354,7 @@ def callback_inline(call):
         bot.answer_callback_query(call.id)
 
 # ==========================================
-# НЕСТ КАРДАНИ ПАЁМИ СИСТЕМАВӢ ВА ТАБРИКИ НАВ
+# 6. НЕСТ КАРДАНИ ПАЁМИ СИСТЕМАВӢ ВА ТАБРИКИ НАВ
 # ==========================================
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome_new_member(message):
@@ -396,7 +405,7 @@ def get_message_text(message):
     return ""
 
 # ==========================================
-# ГУФТУГӮ, АВТО-ОМӮЗИШ ВА МОДЕРАТСИЯ
+# 7. ГУФТУГӮ, АВТО-ОМӮЗИШ ВА МОДЕРАТСИЯ
 # ==========================================
 @bot.message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice'])
 def chat(message):
@@ -526,16 +535,16 @@ def chat(message):
             return
 
     # ==========================================
-    # 3. СИСТЕМАИ НАВИ АВТО-ОМӮЗИШ ВА ҲАМСӮҲБАТӢ (1-ҲАФТАИНА)
+    # СИСТЕМАИ АВТО-ОМӮЗИШ ВА ҲАМСӮҲБАТӢ
     # ==========================================
     if message.chat.type in ['group', 'supergroup'] and message.content_type == 'text':
         text_clean = message.text.strip().lower()
         now = time.time()
 
-        # Тоза кардани саволу ҷавобҳои аз 7 рӯз кӯҳна
+        # Тоза кардани саволу ҷавобҳои кӯҳна ё 2-бор истифодашуда
         ANSWERS = cleanup_old_answers(ANSWERS)
 
-        # А) Агар паём ҷавоб (Reply) ба паёми дигар бошад -> САБТ КАРДАН
+        # А) Агар паём ҷавоб (Reply) бошад -> САБТ КАРДАН
         if message.reply_to_message and message.reply_to_message.text:
             savol = message.reply_to_message.text.strip().lower()
             javob = message.text.strip()
@@ -551,32 +560,47 @@ def chat(message):
                 # Санҷиши такрор нашудани як ҷавоб
                 existing_texts = [item["text"] for item in ANSWERS[global_key][savol] if isinstance(item, dict)]
                 if javob not in existing_texts:
-                    ANSWERS[global_key][savol].append({"text": javob, "time": now})
+                    ANSWERS[global_key][savol].append({"text": javob, "time": now, "use_count": 0})
                     save_answers()
                     print(f"[Базаи Умумӣ] Сабт шуд: '{savol}' -> '{javob}'")
 
-        # Б) ҶАВОБДИҲИИ АВТОМАТӢ (ФАЪОЛ ВА ТАСОДУФӢ)
+        # Б) ҶАВОБДИҲИИ АВТОМАТӢ
         if "GLOBAL" in ANSWERS and ANSWERS["GLOBAL"]:
-            responses_pool = []
+            matched_question = None
 
             # 1. Мувофиқати дақиқи ҷумла
             if text_clean in ANSWERS["GLOBAL"]:
-                responses_pool = [item["text"] for item in ANSWERS["GLOBAL"][text_clean] if isinstance(item, dict)]
+                matched_question = text_clean
 
-            # 2. Ҷӯстуҷӯ аз рӯи калимаҳои асосӣ (агар ҷумла каме фарқ кунад ҳам)
-            if not responses_pool:
-                for q, resp_list in ANSWERS["GLOBAL"].items():
+            # 2. Ҷӯстуҷӯ аз рӯи калимаҳои асосӣ
+            if not matched_question:
+                for q in ANSWERS["GLOBAL"].keys():
                     words = q.split()
-                    # Агар калимаи савол дар паём бошад ё баръакс
                     if any(w in text_clean for w in words if len(w) > 2) or text_clean in q:
-                        responses_pool = [item["text"] for item in resp_list if isinstance(item, dict)]
-                        if responses_pool:
-                            break
+                        matched_question = q
+                        break
 
-            # 3. Интихоби тасодуфии (Random) ҷавоб аз байни сабтшудаҳо
-            if responses_pool:
-                chosen_reply = random.choice(responses_pool)
+            # 3. Интихоб ва истифодаи ҷавоб
+            if matched_question and ANSWERS["GLOBAL"][matched_question]:
+                responses = ANSWERS["GLOBAL"][matched_question]
+                
+                # Интихоби тасодуфии як ҷавоб
+                chosen_item = random.choice(responses)
+                chosen_reply = chosen_item["text"]
+
+                # Фиристодани ҷавоб
                 bot.reply_to(message, chosen_reply)
+
+                # Шавзонидани ҳисобкунак (use_count)
+                chosen_item["use_count"] = chosen_item.get("use_count", 0) + 1
+
+                # Агар 2 маротиба истифода шуда бошад -> нест мекунем
+                if chosen_item["use_count"] >= 2:
+                    responses.remove(chosen_item)
+                    if not responses:
+                        del ANSWERS["GLOBAL"][matched_question]
+
+                save_answers()
                 return
 
 # ==========================================
