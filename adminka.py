@@ -35,8 +35,8 @@ bot = telebot.TeleBot(TOKEN)
 FILE_ANSWERS = "answers.json"
 FILE_GROUPS = "groups.json"
 
-# Вақти нигоҳдории саволу ҷавобҳо: 7 рӯз (бо сония)
-CLEANUP_INTERVAL_SECONDS = 7 * 24 * 3600
+# Вақти нигоҳдории саволу ҷавобҳо: 1 рӯз (бо сония)
+CLEANUP_INTERVAL_SECONDS = 1 * 24 * 3600
 
 user_warnings = {}
 admin_states = {}
@@ -48,7 +48,7 @@ BAD_WORDS = [
 ]
 
 # ==========================================
-# 3. ТОЗАИ НАВШУДАИ БАЗА (2 ИСТИФОДА Ё 7 РӮЗ)
+# 3. ТОЗАИ НАВШУДАИ БАЗА (2 ИСТИФОДА Ё 1 РӮЗ)
 # ==========================================
 def cleanup_old_answers(data):
     current_time = time.time()
@@ -64,7 +64,7 @@ def cleanup_old_answers(data):
                         use_count = item.get("use_count", 0)
                         is_expired = (current_time - item["time"]) > CLEANUP_INTERVAL_SECONDS
                         
-                        # Агар камтар аз 2 бор истифода шуда бошад ва аз 7 рӯз кӯҳна нашуда бошад
+                        # Агар камтар аз 2 бор истифода шуда бошад ва аз 1 рӯз кӯҳна нашуда бошад
                         if use_count < 2 and not is_expired:
                             valid_responses.append(item)
                     elif isinstance(item, str):
@@ -185,12 +185,14 @@ def send_main_menu(chat_id, user_id):
 
     markup = telebot.types.InlineKeyboardMarkup(row_width=1)
     
+    # Танҳо як тугмача барои илова кардан ба гурӯҳ
     btn_add = telebot.types.InlineKeyboardButton(
         "➕ Илова кардан ба гурӯҳ",
         url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
     )
     markup.add(btn_add)
 
+    # Танҳо барои админ тугмаҳои иловагӣ мебароянд
     if user_id == ADMIN_ID:
         btn_admin = telebot.types.InlineKeyboardButton("📊 Гурӯҳҳои васлшуда", callback_data="admin_groups")
         btn_refresh = telebot.types.InlineKeyboardButton("🔄 Навсозии гурӯҳҳо", callback_data="admin_refresh_groups")
@@ -259,13 +261,31 @@ def callback_inline(call):
             btn = telebot.types.InlineKeyboardButton(f"👥 {g_name}", callback_data=f"admin_view_group_{g_id}")
             markup.add(btn)
         
+        # Тугмаи фиристодани паём ба ҳамаи гурӯҳҳо пеш аз тугмаи менюи асосӣ
+        btn_broadcast = telebot.types.InlineKeyboardButton("📢 Паём ба ҳама", callback_data="admin_send_all")
         btn_back = telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu")
+        markup.add(btn_broadcast, btn_back)
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text="📋 <b>Гурӯҳҳое, ки бот дар онҳо васл аст:</b>\n<i>Якеро барои идоракунӣ интихоб кунед ё ба ҳама паём фиристед:</i>",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "admin_send_all":
+        admin_states[user_id] = {"action": "wait_broadcast"}
+        
+        markup = telebot.types.InlineKeyboardMarkup(row_width=1)
+        btn_back = telebot.types.InlineKeyboardButton("❌ Бекор кардан", callback_data="admin_groups")
         markup.add(btn_back)
 
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text="📋 <b>Гурӯҳҳое, ки бот дар онҳо васл аст:</b>\n<i>Якеро барои идоракунӣ ва фиристодани паём интихоб кунед:</i>",
+            text="📢 <b>Лутфан матнеро, ки мехоҳед ба ҲАМАИ гурӯҳҳо фиристед, нависед:</b>\n\n<i>Ин паём ба таври автоматикӣ ба тамоми чатҳои васлшуда равон мешавад.</i>",
             parse_mode="HTML",
             reply_markup=markup
         )
@@ -384,7 +404,7 @@ def welcome_new_member(message):
             continue
         
         user_name = new_user.first_name if new_user.first_name else "Корбар"
-        welcome_text = f"Хуш омадед ба чати мо, {user_name}! 😊✨"
+        welcome_text = f"Хуш омадед ба чати мо, {user_name}! 🫶"
         bot.send_message(chat_id, welcome_text)
 
 # ==========================================
@@ -422,29 +442,67 @@ def chat(message):
         user_name = "Канал / Чат"
         user_username = "Аноним"
 
-    # 1. ПАЁМИ АДМИН АЗ ЛС
+    # 1. ПАЁМИ АДМИН АЗ ЛС (ФИРИСТОДАН БА 1 ГУРӮҲ Ё БА ҲАМА)
     if message.chat.type == 'private' and user_id == ADMIN_ID:
-        if user_id in admin_states and admin_states[user_id].get("action") == "wait_message":
-            group_id = admin_states[user_id]["group_id"]
-            groups = load_groups()
-            group_name = groups.get(group_id, "Номаълум")
+        if user_id in admin_states:
+            action = admin_states[user_id].get("action")
             
-            try:
-                bot.send_message(group_id, message.text)
+            # Агар фиристодани паём ба 1 гурӯҳи муайян бошад
+            if action == "wait_message":
+                group_id = admin_states[user_id]["group_id"]
+                groups = load_groups()
+                group_name = groups.get(group_id, "Номаълум")
+                
+                try:
+                    bot.send_message(group_id, message.text)
+                    admin_states.pop(user_id)
+                    
+                    markup = telebot.types.InlineKeyboardMarkup()
+                    markup.add(telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu"))
+                    
+                    bot.send_message(
+                        chat_id, 
+                        f"✅ Паёми шумо бомуваффақият ба гурӯҳи «<b>{escape_html(group_name)}</b>» фиристода шуд!", 
+                        parse_mode="HTML",
+                        reply_markup=markup
+                    )
+                except Exception as e:
+                    bot.send_message(chat_id, f"❌ Хатогӣ ҳангоми фиристодани паём ба гурӯҳ: {e}")
+                return
+
+            # Агар фиристодани паём ба ҲАМАИ гурӯҳҳо бошад
+            elif action == "wait_broadcast":
+                groups = load_groups()
                 admin_states.pop(user_id)
                 
+                if not groups:
+                    bot.send_message(chat_id, "❌ Ҳеҷ гурӯҳе дар база ёфт нашуд!")
+                    return
+
+                success_count = 0
+                fail_count = 0
+                
+                bot.send_message(chat_id, "⏳ Раванди фиристодани паём ба ҳамаи гурӯҳҳо оғоз шуд...")
+                
+                for g_id in list(groups.keys()):
+                    try:
+                        bot.send_message(int(g_id), message.text)
+                        success_count += 1
+                        time.sleep(0.1)  # Таваққуфи хурд барои пешгирии спам-лимит
+                    except Exception as e:
+                        print(f"Хатогӣ ҳангоми рассылка ба гурӯҳи {g_id}: {e}")
+                        fail_count += 1
+
                 markup = telebot.types.InlineKeyboardMarkup()
                 markup.add(telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu"))
-                
-                bot.send_message(
-                    chat_id, 
-                    f"✅ Паёми шумо бомуваффақият ба гурӯҳи «<b>{escape_html(group_name)}</b>» фиристода шуд!", 
-                    parse_mode="HTML",
-                    reply_markup=markup
+
+                report_text = (
+                    f"📢 <b>Рассылка ба охир расид!</b>\n\n"
+                    f"✅ Ба <b>{success_count}</b> гурӯҳ муваффақона расонида шуд.\n"
+                    f"❌ Ба <b>{fail_count}</b> гурӯҳ фиристода нашуд (шояд бот баромад ё бан шуд)."
                 )
-            except Exception as e:
-                bot.send_message(chat_id, f"❌ Хатогӣ ҳангоми фиристодани паём ба гурӯҳ: {e}")
-            return
+                bot.send_message(chat_id, report_text, parse_mode="HTML", reply_markup=markup)
+                return
 
     # САБТИ ГУРӮҲ
     if message.chat.type in ['group', 'supergroup']:
