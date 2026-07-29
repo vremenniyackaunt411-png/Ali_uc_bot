@@ -35,8 +35,8 @@ bot = telebot.TeleBot(TOKEN)
 FILE_ANSWERS = "answers.json"
 FILE_GROUPS = "groups.json"
 
-# Вақти нигоҳдории саволу ҷавобҳо: 1 рӯз (бо сония)
-CLEANUP_INTERVAL_SECONDS = 1 * 24 * 3600
+# Вақти нигоҳдории саволу ҷавобҳо: 7 рӯз
+CLEANUP_INTERVAL_SECONDS = 7 * 24 * 3600
 
 user_warnings = {}
 admin_states = {}
@@ -48,7 +48,7 @@ BAD_WORDS = [
 ]
 
 # ==========================================
-# 3. ТОЗАИ НАВШУДАИ БАЗА (2 ИСТИФОДА Ё 1 РӮЗ)
+# 3. ТОЗАИ НАВШУДАИ БАЗА (2 ИСТИФОДА Ё 7 РӮЗ)
 # ==========================================
 def cleanup_old_answers(data):
     current_time = time.time()
@@ -64,11 +64,9 @@ def cleanup_old_answers(data):
                         use_count = item.get("use_count", 0)
                         is_expired = (current_time - item["time"]) > CLEANUP_INTERVAL_SECONDS
                         
-                        # Агар камтар аз 2 бор истифода шуда бошад ва аз 1 рӯз кӯҳна нашуда бошад
                         if use_count < 2 and not is_expired:
                             valid_responses.append(item)
                     elif isinstance(item, str):
-                        # Барои поддежкаи формати кӯҳна
                         valid_responses.append({"text": item, "time": current_time, "use_count": 0})
             
             cleaned_questions[q] = valid_responses
@@ -185,14 +183,12 @@ def send_main_menu(chat_id, user_id):
 
     markup = telebot.types.InlineKeyboardMarkup(row_width=1)
     
-    # Танҳо як тугмача барои илова кардан ба гурӯҳ
     btn_add = telebot.types.InlineKeyboardButton(
         "➕ Илова кардан ба гурӯҳ",
         url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
     )
     markup.add(btn_add)
 
-    # Танҳо барои админ тугмаҳои иловагӣ мебароянд
     if user_id == ADMIN_ID:
         btn_admin = telebot.types.InlineKeyboardButton("📊 Гурӯҳҳои васлшуда", callback_data="admin_groups")
         btn_refresh = telebot.types.InlineKeyboardButton("🔄 Навсозии гурӯҳҳо", callback_data="admin_refresh_groups")
@@ -261,7 +257,6 @@ def callback_inline(call):
             btn = telebot.types.InlineKeyboardButton(f"👥 {g_name}", callback_data=f"admin_view_group_{g_id}")
             markup.add(btn)
         
-        # Тугмаи фиристодани паём ба ҳамаи гурӯҳҳо пеш аз тугмаи менюи асосӣ
         btn_broadcast = telebot.types.InlineKeyboardButton("📢 Паём ба ҳама", callback_data="admin_send_all")
         btn_back = telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu")
         markup.add(btn_broadcast, btn_back)
@@ -334,10 +329,26 @@ def callback_inline(call):
             reply_markup=markup
         )
 
+    # ИСЛОҲИ ТАЪГИРОТИ 2: ИСТИНОД (ССЫЛКА) ПАС АЗ НОМИ ЧАТ
     elif call.data.startswith("admin_view_group_"):
         group_id = call.data.replace("admin_view_group_", "")
         groups = load_groups()
         group_name = groups.get(group_id, "Номаълум")
+
+        group_link = "Дастрас нест (бот ҳуқуқи админ надорад)"
+        try:
+            chat_obj = bot.get_chat(int(group_id))
+            if chat_obj.invite_link:
+                group_link = chat_obj.invite_link
+            elif chat_obj.username:
+                group_link = f"https://t.me/{chat_obj.username}"
+            else:
+                try:
+                    group_link = bot.export_chat_invite_link(int(group_id))
+                except Exception:
+                    group_link = "Сохта нашуд (бот ҳуқуқи даъватро надорад)"
+        except Exception as e:
+            print(f"Хатогӣ дар гирифтани маълумоти чат {group_id}: {e}")
 
         markup = telebot.types.InlineKeyboardMarkup(row_width=1)
         btn_send = telebot.types.InlineKeyboardButton("✍️ Фиристодани паём", callback_data=f"admin_send_msg_{group_id}")
@@ -347,7 +358,13 @@ def callback_inline(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text=f"<b>Гурӯҳи Интихобшуда:</b>\n\n👥 Ном: {escape_html(group_name)}\n🆔 ID: <code>{group_id}</code>\n\nБарои аз номи бот ба ин гурӯҳ равон кардани паём тугмаи зеринро зер кунед:",
+            text=(
+                f"<b>Гурӯҳи Интихобшуда:</b>\n\n"
+                f"👥 <b>Ном:</b> {escape_html(group_name)}\n"
+                f"🔗 <b>Ссылка:</b> {group_link}\n"
+                f"🆔 <b>ID:</b> <code>{group_id}</code>\n\n"
+                f"Барои аз номи бот ба ин гурӯҳ равон кардани паём тугмаи зеринро зер кунед:"
+            ),
             parse_mode="HTML",
             reply_markup=markup
         )
@@ -447,7 +464,6 @@ def chat(message):
         if user_id in admin_states:
             action = admin_states[user_id].get("action")
             
-            # Агар фиристодани паём ба 1 гурӯҳи муайян бошад
             if action == "wait_message":
                 group_id = admin_states[user_id]["group_id"]
                 groups = load_groups()
@@ -470,7 +486,6 @@ def chat(message):
                     bot.send_message(chat_id, f"❌ Хатогӣ ҳангоми фиристодани паём ба гурӯҳ: {e}")
                 return
 
-            # Агар фиристодани паём ба ҲАМАИ гурӯҳҳо бошад
             elif action == "wait_broadcast":
                 groups = load_groups()
                 admin_states.pop(user_id)
@@ -488,7 +503,7 @@ def chat(message):
                     try:
                         bot.send_message(int(g_id), message.text)
                         success_count += 1
-                        time.sleep(0.1)  # Таваққуфи хурд барои пешгирии спам-лимит
+                        time.sleep(0.1)
                     except Exception as e:
                         print(f"Хатогӣ ҳангоми рассылка ба гурӯҳи {g_id}: {e}")
                         fail_count += 1
@@ -599,7 +614,6 @@ def chat(message):
         text_clean = message.text.strip().lower()
         now = time.time()
 
-        # Тоза кардани саволу ҷавобҳои кӯҳна ё 2-бор истифодашуда
         ANSWERS = cleanup_old_answers(ANSWERS)
 
         # А) Агар паём ҷавоб (Reply) бошад -> САБТ КАРДАН
@@ -615,44 +629,43 @@ def chat(message):
                 if savol not in ANSWERS[global_key]:
                     ANSWERS[global_key][savol] = []
 
-                # Санҷиши такрор нашудани як ҷавоб
                 existing_texts = [item["text"] for item in ANSWERS[global_key][savol] if isinstance(item, dict)]
                 if javob not in existing_texts:
                     ANSWERS[global_key][savol].append({"text": javob, "time": now, "use_count": 0})
                     save_answers()
                     print(f"[Базаи Умумӣ] Сабт шуд: '{savol}' -> '{javob}'")
 
-        # Б) ҶАВОБДИҲИИ АВТОМАТӢ
+        # Б) ҶАВОБДИҲИИ АВТОМАТӢ (2 КАЛИМА ВА БЕШ АЗ 2 КАЛИМА)
         if "GLOBAL" in ANSWERS and ANSWERS["GLOBAL"]:
             matched_question = None
 
-            # 1. Мувофиқати дақиқи ҷумла
-            if text_clean in ANSWERS["GLOBAL"]:
-                matched_question = text_clean
+            user_words = [w for w in re.findall(r'\b\w+\b', text_clean) if len(w) > 1]
 
-            # 2. Ҷӯстуҷӯ аз рӯи калимаҳои асосӣ
-            if not matched_question:
-                for q in ANSWERS["GLOBAL"].keys():
-                    words = q.split()
-                    if any(w in text_clean for w in words if len(w) > 2) or text_clean in q:
-                        matched_question = q
-                        break
+            # Агар корбар 2 ё бештар калима нависад
+            if len(user_words) >= 2:
+                # 1. Мувофиқати дақиқ
+                if text_clean in ANSWERS["GLOBAL"]:
+                    matched_question = text_clean
+                else:
+                    # 2. Санҷиши мувофиқати 2 ё беш аз 2 калима бо саволҳои база
+                    for q in ANSWERS["GLOBAL"].keys():
+                        q_words = set(re.findall(r'\b\w+\b', q))
+                        matching_count = sum(1 for w in user_words if w in q_words)
+                        
+                        if matching_count >= 2:
+                            matched_question = q
+                            break
 
-            # 3. Интихоб ва истифодаи ҷавоб
             if matched_question and ANSWERS["GLOBAL"][matched_question]:
                 responses = ANSWERS["GLOBAL"][matched_question]
                 
-                # Интихоби тасодуфии як ҷавоб
                 chosen_item = random.choice(responses)
                 chosen_reply = chosen_item["text"]
 
-                # Фиристодани ҷавоб
                 bot.reply_to(message, chosen_reply)
 
-                # Шавзонидани ҳисобкунак (use_count)
                 chosen_item["use_count"] = chosen_item.get("use_count", 0) + 1
 
-                # Агар 2 маротиба истифода шуда бошад -> нест мекунем
                 if chosen_item["use_count"] >= 2:
                     responses.remove(chosen_item)
                     if not responses:
