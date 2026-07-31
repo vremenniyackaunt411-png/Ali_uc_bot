@@ -34,6 +34,7 @@ ADMIN_ID = 6871575684
 bot = telebot.TeleBot(TOKEN)
 FILE_ANSWERS = "answers.json"
 FILE_GROUPS = "groups.json"
+FILE_BAD_WORDS = "bad_words.json"
 
 # Вақти нигоҳдории саволу ҷавобҳо: 7 рӯз
 CLEANUP_INTERVAL_SECONDS = 7 * 24 * 3600
@@ -41,11 +42,29 @@ CLEANUP_INTERVAL_SECONDS = 7 * 24 * 3600
 user_warnings = {}
 admin_states = {}
 
-BAD_WORDS = [
+DEFAULT_BAD_WORDS = [
     'кунти', 'бго', 'гандон', 'ксиапа', 'ксиоча', 'кси оча', 'кси апа', 'кси хола', 'модарта мег', 'сука', 'сучка', 'далбаёб', 
     'фуруши дорм', 'фуруши дорам', 'ки мехара', 'апата г', 'апата мег', 'очата г', 'очата мег', 'отата г', 'отата мег', 'suka', 'su4ka',
     'мегом', 'ksti', 'o4ata m', 'apata m', 'керм', 'kerm', 'мехарм', 'мехарам', 'gom', 'гойда' 
 ]
+
+# ==========================================
+# ФАЙЛҲОИ ДИНАМИКИИ КАЛИМАҲОИ НОҶО
+# ==========================================
+def load_bad_words():
+    if os.path.exists(FILE_BAD_WORDS):
+        with open(FILE_BAD_WORDS, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except:
+                return DEFAULT_BAD_WORDS.copy()
+    return DEFAULT_BAD_WORDS.copy()
+
+def save_bad_words(words_list):
+    with open(FILE_BAD_WORDS, "w", encoding="utf-8") as f:
+        json.dump(words_list, f, ensure_ascii=False, indent=4)
+
+BAD_WORDS = load_bad_words()
 
 # ==========================================
 # 3. ТОЗАИ НАВШУДАИ БАЗА (2 ИСТИФОДА Ё 7 РӮЗ)
@@ -173,26 +192,28 @@ def restrict_user(chat_id, user_id, hours):
     )
     bot.restrict_chat_member(chat_id, user_id, until_date=until_date, permissions=permissions)
 
-# ==========================================
-# 4. МЕНЮИ АСОСӢ (БАРОИ ЛС - ЧАТИ БОТ)
-# ==========================================
-def send_main_menu(chat_id, user_id):
+def get_add_to_group_keyboard():
     global BOT_USERNAME
     if not BOT_USERNAME:
         BOT_USERNAME = bot.get_me().username
-
-    markup = telebot.types.InlineKeyboardMarkup(row_width=1)
-    
+    markup = telebot.types.InlineKeyboardMarkup()
     btn_add = telebot.types.InlineKeyboardButton(
         "➕ Илова кардан ба гурӯҳ",
         url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
     )
     markup.add(btn_add)
+    return markup
+
+# ==========================================
+# 4. МЕНЮИ АСОСӢ (БАРОИ ЛС - ЧАТИ БОТ)
+# ==========================================
+def send_main_menu(chat_id, user_id):
+    markup = get_add_to_group_keyboard()
 
     if user_id == ADMIN_ID:
         btn_admin = telebot.types.InlineKeyboardButton("📊 Гурӯҳҳои васлшуда", callback_data="admin_groups")
-        btn_refresh = telebot.types.InlineKeyboardButton("🔄 Навсозии гурӯҳҳо", callback_data="admin_refresh_groups")
-        markup.add(btn_admin, btn_refresh)
+        btn_params = telebot.types.InlineKeyboardButton("⚙️ Параметрҳо", callback_data="admin_params")
+        markup.add(btn_admin, btn_params)
 
     welcome_text = (
         "<b>Салом! Хуш омадед ба боти муҳофиз! 👋🤖</b>\n\n"
@@ -232,6 +253,7 @@ def start(message):
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
+    global BAD_WORDS
     user_id = call.from_user.id
     chat_id = call.message.chat.id
 
@@ -265,6 +287,101 @@ def callback_inline(call):
             chat_id=chat_id,
             message_id=call.message.message_id,
             text="📋 <b>Гурӯҳҳое, ки бот дар онҳо васл аст:</b>\n<i>Якеро барои идоракунӣ интихоб кунед ё ба ҳама паём фиристед:</i>",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "admin_params":
+        markup = telebot.types.InlineKeyboardMarkup(row_width=1)
+        btn_blocked = telebot.types.InlineKeyboardButton("🚫 Корбарони блокшуда", callback_data="admin_blocked_users")
+        btn_badwords = telebot.types.InlineKeyboardButton("🤬 Калимаҳои ноҷо", callback_data="admin_bad_words_menu")
+        btn_refresh = telebot.types.InlineKeyboardButton("🔄 Навсозии гурӯҳҳо", callback_data="admin_refresh_groups")
+        btn_back = telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu")
+        markup.add(btn_blocked, btn_badwords, btn_refresh, btn_back)
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text="⚙️ <b>Параметрҳои танзими бот:</b>\n\nБахши дилхоҳро интихоб кунед:",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "admin_blocked_users":
+        blocked_text = "🚫 <b>Рӯйхати корбарони блокшуда (Mute/Warn):</b>\n\n"
+        has_blocked = False
+
+        for u_id, data in user_warnings.items():
+            b_count = data.get("bad_words", 0)
+            s_count = data.get("spam", 0)
+            if b_count > 0 or s_count > 0:
+                has_blocked = True
+                blocked_text += f"👤 Корбар ID: <code>{u_id}</code> | Дашном: <b>{b_count}/3</b> | Спам: <b>{s_count}/3</b>\n"
+
+        if not has_blocked:
+            blocked_text += "<i>Дар ҳоли ҳозир корбари блокшуда ё огоҳидошта нест.</i>"
+
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("🔙 Ба параметрҳо", callback_data="admin_params"))
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=blocked_text,
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "admin_bad_words_menu":
+        markup = telebot.types.InlineKeyboardMarkup(row_width=2)
+        btn_add = telebot.types.InlineKeyboardButton("➕ Илова кардан", callback_data="admin_add_bad_word")
+        btn_del = telebot.types.InlineKeyboardButton("🗑 Нест кардан", callback_data="admin_del_bad_word")
+        btn_back = telebot.types.InlineKeyboardButton("🔙 Ба параметрҳо", callback_data="admin_params")
+        markup.add(btn_add, btn_del)
+        markup.add(btn_back)
+
+        words_formatted = ", ".join([f"<code>{w}</code>" for w in BAD_WORDS])
+        text_msg = (
+            f"🤬 <b>Калимаҳои ноҷо ва манъшуда:</b>\n\n"
+            f"{words_formatted}\n\n"
+            f"<i>Амалро интихоб кунед:</i>"
+        )
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=text_msg,
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "admin_add_bad_word":
+        admin_states[user_id] = {"action": "wait_add_bad_word"}
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("❌ Бекор кардан", callback_data="admin_bad_words_menu"))
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text="➕ <b>Калимаи нав нависед:</b>\n\n<i>Калимаеро, ки мехоҳед дар гурӯҳҳо манъ карда шавад ва барои он бан дода шавад, равон кунед:</i>",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == "admin_del_bad_word":
+        admin_states[user_id] = {"action": "wait_del_bad_word"}
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("❌ Бекор кардан", callback_data="admin_bad_words_menu"))
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text="🗑 <b>Калимаро барои нест кардан нависед:</b>\n\n<i>Он калимае, ки мехоҳед дигар блок дода нашавад, равон кунед:</i>",
             parse_mode="HTML",
             reply_markup=markup
         )
@@ -314,7 +431,7 @@ def callback_inline(call):
         save_groups(updated_groups)
         
         markup = telebot.types.InlineKeyboardMarkup()
-        markup.add(telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu"))
+        markup.add(telebot.types.InlineKeyboardButton("🔙 Ба параметрҳо", callback_data="admin_params"))
         
         bot.edit_message_text(
             chat_id=chat_id,
@@ -329,7 +446,6 @@ def callback_inline(call):
             reply_markup=markup
         )
 
-    # ИСЛОҲИ ТАЪГИРОТИ 2: ИСТИНОД (ССЫЛКА) ПАС АЗ НОМИ ЧАТ
     elif call.data.startswith("admin_view_group_"):
         group_id = call.data.replace("admin_view_group_", "")
         groups = load_groups()
@@ -446,7 +562,10 @@ def get_message_text(message):
 # ==========================================
 @bot.message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice'])
 def chat(message):
-    global ANSWERS
+    global ANSWERS, BAD_WORDS, BOT_USERNAME
+    if not BOT_USERNAME:
+        BOT_USERNAME = bot.get_me().username
+
     chat_id = str(message.chat.id)
     user_id = message.from_user.id if message.from_user else None
     chat_title = message.chat.title or "Гурӯҳ"
@@ -459,12 +578,34 @@ def chat(message):
         user_name = "Канал / Чат"
         user_username = "Аноним"
 
-    # 1. ПАЁМИ АДМИН АЗ ЛС (ФИРИСТОДАН БА 1 ГУРӮҲ Ё БА ҲАМА)
+    # 1. ПАЁМИ АДМИН АЗ ЛС (ИДОРАКУНӢ ВА КАЛИМАҲОИ НОҶО)
     if message.chat.type == 'private' and user_id == ADMIN_ID:
         if user_id in admin_states:
             action = admin_states[user_id].get("action")
             
-            if action == "wait_message":
+            if action == "wait_add_bad_word":
+                new_word = message.text.strip().lower()
+                if new_word and new_word not in BAD_WORDS:
+                    BAD_WORDS.append(new_word)
+                    save_bad_words(BAD_WORDS)
+                    bot.send_message(chat_id, f"✅ Калимаи «<b>{escape_html(new_word)}</b>» ба рӯйхати калимаҳои манъшуда илова шуд ва аз ин пас барои он бан дода мешавад!", parse_mode="HTML")
+                else:
+                    bot.send_message(chat_id, "⚠️ Ин калима аллакай дар рӯйхат мавҷуд аст ё нодуруст навишта шуд.")
+                admin_states.pop(user_id)
+                return
+
+            elif action == "wait_del_bad_word":
+                word_to_del = message.text.strip().lower()
+                if word_to_del in BAD_WORDS:
+                    BAD_WORDS.remove(word_to_del)
+                    save_bad_words(BAD_WORDS)
+                    bot.send_message(chat_id, f"✅ Калимаи «<b>{escape_html(word_to_del)}</b>» аз рӯйхат нест карда шуд ва акнун барои он блок дода намешавад!", parse_mode="HTML")
+                else:
+                    bot.send_message(chat_id, "⚠️ Ин калима дар рӯйхати калимаҳои ноҷо ёфт шумод.")
+                admin_states.pop(user_id)
+                return
+
+            elif action == "wait_message":
                 group_id = admin_states[user_id]["group_id"]
                 groups = load_groups()
                 group_name = groups.get(group_id, "Номаълум")
@@ -491,7 +632,7 @@ def chat(message):
                 admin_states.pop(user_id)
                 
                 if not groups:
-                    bot.send_message(chat_id, "❌ Ҳеҷ гурӯҳе дар база ёфт нашуд!")
+                    bot.send_message(chat_id, "❌ Ҳеҷ гурӯҳе дар база ёфт نشуд!")
                     return
 
                 success_count = 0
@@ -534,6 +675,7 @@ def chat(message):
         if user_id not in user_warnings:
             user_warnings[user_id] = {"bad_words": 0, "spam": 0}
 
+        # --- КАЛИМАҲОИ НОҶО ---
         if has_bad_words(msg_text):
             if message.chat.type in ['group', 'supergroup']:
                 try:
@@ -551,17 +693,21 @@ def chat(message):
                     )
                     send_to_owner(owner_alert)
 
+                    add_btn_markup = get_add_to_group_keyboard()
+
                     if warnings_count < 3:
                         bot.send_message(
                             message.chat.id, 
-                            f"⚠️ {user_name}, навиштани калимаҳои ноҷо ва дашном қатъиян манъ аст!\nОгоҳӣ: ({warnings_count}/3)"
+                            f"⚠️ {user_name}, навиштани калимаҳои ноҷо ва дашном қатъиян манъ аст!\nОгоҳӣ: ({warnings_count}/3)",
+                            reply_markup=add_btn_markup
                         )
                     else:
                         restrict_user(message.chat.id, user_id, 8)
                         bot.send_message(
                             message.chat.id, 
                             f"🚫 {user_name} барои истифодаи мунтазами калимаҳои ноҷо ба муҳлати <b>8 соат</b> бесадо (Mute) карда шуд!",
-                            parse_mode="HTML"
+                            parse_mode="HTML",
+                            reply_markup=add_btn_markup
                         )
                         send_to_owner(f"🚫 Корбар {escape_html(user_name)} (<code>{user_id}</code>) барои сухани ноҷо дар гурӯҳи {escape_html(chat_title)} <b>8 соат бан (Mute)</b> шуд!")
                         user_warnings[user_id]["bad_words"] = 0
@@ -569,6 +715,7 @@ def chat(message):
                     print(f"❌ Хатогӣ ҳангоми ҷаримаи калимаи ноҷо: {e}")
             return
 
+        # --- ССЫЛКА, НИКНЕЙМ ВА ПЕРЕСЛАТЬ (СПАМ/РЕКЛАМА) ---
         is_forwarded = message.forward_from or message.forward_from_chat or message.forward_sender_name
         if has_link(msg_text) or has_username(msg_text) or is_forwarded:
             if message.chat.type in ['group', 'supergroup']:
@@ -589,17 +736,21 @@ def chat(message):
                     )
                     send_to_owner(owner_alert)
 
+                    add_btn_markup = get_add_to_group_keyboard()
+
                     if warnings_count < 3:
                         bot.send_message(
                             message.chat.id, 
-                            f"⚠️ {user_name}, фиристодани {reason} реклама ҳисоб шуда, манъ аст!\nОгоҳӣ: ({warnings_count}/3)"
+                            f"⚠️ {user_name}, фиристодани {reason} реклама ҳисоб шуда, манъ аст!\nОгоҳӣ: ({warnings_count}/3)",
+                            reply_markup=add_btn_markup
                         )
                     else:
                         restrict_user(message.chat.id, user_id, 24)
                         bot.send_message(
                             message.chat.id, 
                             f"🚫 {user_name} барои паҳн кардани реклама ва спам ба муҳлати <b>24 соат</b> бесадо (Mute) карда шуд!",
-                            parse_mode="HTML"
+                            parse_mode="HTML",
+                            reply_markup=add_btn_markup
                         )
                         send_to_owner(f"🚫 Корбар {escape_html(user_name)} (<code>{user_id}</code>) барои спам/реклама дар гурӯҳи {escape_html(chat_title)} <b>24 соат бан (Mute)</b> шуд!")
                         user_warnings[user_id]["spam"] = 0
