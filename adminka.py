@@ -4,6 +4,7 @@ import json
 import time
 import random
 import threading
+from datetime import datetime
 from flask import Flask
 import telebot
 
@@ -142,7 +143,7 @@ def escape_html(text):
 
 def send_to_owner(text):
     try:
-        bot.send_message(ADMIN_ID, text, parse_mode="HTML")
+        bot.send_message(ADMIN_ID, text, parse_mode="HTML", disable_web_page_preview=True)
     except Exception as e:
         print(f"⚠️ Хатогӣ ҳангоми фиристодани паём ба соҳиби бот: {e}")
 
@@ -203,6 +204,21 @@ def get_add_to_group_keyboard():
     )
     markup.add(btn_add)
     return markup
+
+def get_group_link(chat_id):
+    try:
+        chat_obj = bot.get_chat(int(chat_id))
+        if chat_obj.invite_link:
+            return chat_obj.invite_link
+        elif chat_obj.username:
+            return f"https://t.me/{chat_obj.username}"
+        else:
+            try:
+                return bot.export_chat_invite_link(int(chat_id))
+            except:
+                return None
+    except:
+        return None
 
 # ==========================================
 # 4. МЕНЮИ АСОСӢ (БАРОИ ЛС - ЧАТИ БОТ)
@@ -309,19 +325,38 @@ def callback_inline(call):
         )
         bot.answer_callback_query(call.id)
 
+    # --- РӮЙХАТИ КОРБАРОНИ БЛОКШУДА (НАВСОЗИШУДА) ---
     elif call.data == "admin_blocked_users":
-        blocked_text = "🚫 <b>Рӯйхати корбарони блокшуда (Mute/Warn):</b>\n\n"
+        blocked_text = "🚫 <b>Рӯйхати корбарони блокшуда (Mute):</b>\n\n"
         has_blocked = False
 
         for u_id, data in user_warnings.items():
-            b_count = data.get("bad_words", 0)
-            s_count = data.get("spam", 0)
-            if b_count > 0 or s_count > 0:
+            if data.get("mute_until", 0) > time.time():
                 has_blocked = True
-                blocked_text += f"👤 Корбар ID: <code>{u_id}</code> | Дашном: <b>{b_count}/3</b> | Спам: <b>{s_count}/3</b>\n"
+                u_name = escape_html(data.get("name", "Корбар"))
+                u_username = data.get("username", "Никнейм надорад")
+                g_title = escape_html(data.get("group_title", "Гурӯҳ"))
+                g_link = data.get("group_link")
+
+                start_str = datetime.fromtimestamp(data.get("mute_start", time.time())).strftime("%d.%m.%Y %H:%M")
+                until_str = datetime.fromtimestamp(data.get("mute_until", time.time())).strftime("%d.%m.%Y %H:%M")
+
+                if g_link:
+                    group_str = f"<a href='{g_link}'>{g_title}</a>"
+                else:
+                    group_str = g_title
+
+                user_str = f"<a href='tg://user?id={u_id}'>{u_name}</a> ({escape_html(u_username)})"
+
+                blocked_text += (
+                    f"👤 <b>Корбар:</b> {user_str}\n"
+                    f"👥 <b>Аз гурӯҳи:</b> {group_str}\n"
+                    f"⏰ <b>Блок шуд:</b> {start_str} то {until_str}\n"
+                    f"──────────────────\n"
+                )
 
         if not has_blocked:
-            blocked_text += "<i>Дар ҳоли ҳозир корбари блокшуда ё огоҳидошта нест.</i>"
+            blocked_text += "<i>Дар ҳоли ҳозир корбари блокшуда (Mute) нест.</i>"
 
         markup = telebot.types.InlineKeyboardMarkup()
         markup.add(telebot.types.InlineKeyboardButton("🔙 Ба параметрҳо", callback_data="admin_params"))
@@ -331,6 +366,7 @@ def callback_inline(call):
             message_id=call.message.message_id,
             text=blocked_text,
             parse_mode="HTML",
+            disable_web_page_preview=True,
             reply_markup=markup
         )
         bot.answer_callback_query(call.id)
@@ -450,21 +486,7 @@ def callback_inline(call):
         group_id = call.data.replace("admin_view_group_", "")
         groups = load_groups()
         group_name = groups.get(group_id, "Номаълум")
-
-        group_link = "Дастрас нест (бот ҳуқуқи админ надорад)"
-        try:
-            chat_obj = bot.get_chat(int(group_id))
-            if chat_obj.invite_link:
-                group_link = chat_obj.invite_link
-            elif chat_obj.username:
-                group_link = f"https://t.me/{chat_obj.username}"
-            else:
-                try:
-                    group_link = bot.export_chat_invite_link(int(group_id))
-                except Exception:
-                    group_link = "Сохта нашуд (бот ҳуқуқи даъватро надорад)"
-        except Exception as e:
-            print(f"Хатогӣ дар гирифтани маълумоти чат {group_id}: {e}")
+        group_link = get_group_link(group_id) or "Дастрас нест"
 
         markup = telebot.types.InlineKeyboardMarkup(row_width=1)
         btn_send = telebot.types.InlineKeyboardButton("✍️ Фиристодани паём", callback_data=f"admin_send_msg_{group_id}")
@@ -673,7 +695,22 @@ def chat(message):
     # 2. АНТИСПАМ ВА АНТИДАШНОМ
     if not is_admin and user_id:
         if user_id not in user_warnings:
-            user_warnings[user_id] = {"bad_words": 0, "spam": 0}
+            user_warnings[user_id] = {
+                "bad_words": 0, 
+                "spam": 0, 
+                "name": user_name, 
+                "username": user_username, 
+                "group_title": chat_title, 
+                "group_link": get_group_link(message.chat.id),
+                "mute_start": 0, 
+                "mute_until": 0
+            }
+        else:
+            user_warnings[user_id]["name"] = user_name
+            user_warnings[user_id]["username"] = user_username
+            user_warnings[user_id]["group_title"] = chat_title
+            if not user_warnings[user_id].get("group_link"):
+                user_warnings[user_id]["group_link"] = get_group_link(message.chat.id)
 
         # --- КАЛИМАҲОИ НОҶО ---
         if has_bad_words(msg_text):
@@ -703,6 +740,12 @@ def chat(message):
                         )
                     else:
                         restrict_user(message.chat.id, user_id, 8)
+                        
+                        now_ts = time.time()
+                        until_ts = now_ts + (8 * 3600)
+                        user_warnings[user_id]["mute_start"] = now_ts
+                        user_warnings[user_id]["mute_until"] = until_ts
+
                         bot.send_message(
                             message.chat.id, 
                             f"🚫 {user_name} барои истифодаи мунтазами калимаҳои ноҷо ба муҳлати <b>8 соат</b> бесадо (Mute) карда шуд!",
@@ -746,6 +789,12 @@ def chat(message):
                         )
                     else:
                         restrict_user(message.chat.id, user_id, 24)
+
+                        now_ts = time.time()
+                        until_ts = now_ts + (24 * 3600)
+                        user_warnings[user_id]["mute_start"] = now_ts
+                        user_warnings[user_id]["mute_until"] = until_ts
+
                         bot.send_message(
                             message.chat.id, 
                             f"🚫 {user_name} барои паҳн кардани реклама ва спам ба муҳлати <b>24 соат</b> бесадо (Mute) карда шуд!",
