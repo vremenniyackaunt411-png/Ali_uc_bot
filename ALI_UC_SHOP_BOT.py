@@ -217,8 +217,8 @@ def user_inline_menu(call):
     except Exception:
         pass
 
-# Қабули паёми корбар барои админ
-@bot.message_handler(content_types=['text', 'photo', 'voice', 'video', 'document'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_admin_message"))
+# Қабули паёми корбар барои админ (бо фитри дақиқи ID-и админ)
+@bot.message_handler(content_types=['text', 'photo', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_admin_message") == True)
 def forward_message_to_admin(message):
     chat_id = message.chat.id
     user_name = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
@@ -247,7 +247,7 @@ def forward_message_to_admin(message):
         bot.send_document(ADMIN_ID, file_id, caption=f"{forward_text}\n\n📁 Ҳуҷҷат: {caption}", reply_markup=markup, parse_mode="Markdown")
         
     bot.reply_to(message, "Паёми шумо қабул шуд ва ба админ фиристода шуд! ⏳ Лутфан мутобиқи ҷавоб интизор шавед.")
-    user_data[chat_id].pop("waiting_for_admin_message", None)
+    user_data[chat_id]["waiting_for_admin_message"] = False
 
 # Ҷавоб додани админ ба корбар
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reply_"))
@@ -292,14 +292,14 @@ def select_uc_package(call):
     except Exception:
         pass
 
-# 3. Қабули PUBG ID ва реквизитҳо
-@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_id"))
+# 3. Қабули PUBG ID ва реквизитҳо (бо филтри дақиқ)
+@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_id") == True)
 def receive_pubg_id(message):
     chat_id = message.chat.id
     pubg_id = message.text.strip()
     
     user_data[chat_id]["pubg_id"] = pubg_id
-    user_data[chat_id].pop("waiting_for_id", None)
+    user_data[chat_id]["waiting_for_id"] = False
     user_data[chat_id]["waiting_for_screenshot"] = True
     
     pkg = user_data[chat_id]["package"]
@@ -327,12 +327,12 @@ def receive_pubg_id(message):
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
 # 4. Пешгирии хатогӣ дар вақти интизории скриншот
-@bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
+@bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot") == True)
 def wrong_screenshot_format(message):
     bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед ё аз тугмаҳои меню истифода баред!")
 
 # Қабули скриншот ва равон кардан ба админ
-@bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
+@bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot") == True)
 def receive_screenshot(message):
     chat_id = message.chat.id
     file_id = message.photo[-1].file_id
@@ -341,7 +341,7 @@ def receive_screenshot(message):
     price = user_data[chat_id]["price"]
     pubg_id = user_data[chat_id]["pubg_id"]
     
-    user_data[chat_id].pop("waiting_for_screenshot", None)
+    user_data[chat_id]["waiting_for_screenshot"] = False
     
     user_data[chat_id]["last_order_info"] = f"📦 Пакет: {pkg}\n🆔 ID: `{pubg_id}`\n💰 Маблағ: {price}\n⏳ Статус: Дар навбат..."
     
@@ -420,11 +420,11 @@ def review_start_callback(call):
     except Exception:
         pass
 
-@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_review"))
+@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_review") == True)
 def receive_review_text(message):
     chat_id = message.chat.id
     review_text = message.text
-    user_data[chat_id].pop("waiting_for_review", None)
+    user_data[chat_id]["waiting_for_review"] = False
     
     markup_user = types.InlineKeyboardMarkup()
     markup_user.add(types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu"))
