@@ -1,476 +1,176 @@
-from threading import Thread
-from flask import Flask
+# Намунаи коди идоракунии закази UC ва отзывҳо (Python / Telebot)
+# Илтимос, тағйироти лозимиро (token ва admin_id) ба коди асосии худ мувофиқ кунед.
+
 import telebot
 from telebot import types
 
-# --- ВЕБ-СЕРВЕР БАРОИ UPTIMEROBOT ---
-app = Flask("")
-
-
-@app.route("/")
-def home():
-  return "Бот фаъол аст!"
-
-
-def run_http():
-  app.run(host="0.0.0.0", port=8080)
-
-
-def keep_alive():
-  t = Thread(target=run_http)
-  t.start()
-
-
-# --- НАЗМОТИ БОТ ---
-TOKEN = "8660164143:AAGL13-xIC2pln1JKKYiPQagb2dzn6N9hhQ"
-ADMIN_CHAT_ID = 6871575684
-BANK_CARD = "555050093 \n(Душанбе Сити / Алиф Банк / Бонки Эсхата)"
+TOKEN = "BOT_TOKEN_IN_HERE"
+ADMIN_ID = 123456789  # Айдии админ дар Telegram
 
 bot = telebot.TeleBot(TOKEN)
 
-PRICES = {
-    "60": "10 сомонӣ",
-    "120": "20 сомонӣ",
-    "180": "30 сомонӣ",
-    "325": "48 сомонӣ",
-    "385": "58 сомонӣ",
-    "660": "92 сомонӣ",
-    "720": "102 сомонӣ",
-    "1320": "184 сомонӣ",
-    "1800": "240 сомонӣ",
-    "3850": "450 сомонӣ",
-    "8100": "870 сомонӣ",
-}
-
+# Базаи муваққатӣ барои нигоҳ доштани ҳолати корбарон (дар лоиҳаи калон ба БД мегузаред)
 user_data = {}
-orders_db = {}
-order_counter = 1
+user_review_attempts = {} # Барои ҳисоби кӯшишҳои отзыв (то 2 маротиба)
 
-
-# --- ФАРМОНИ СТАРТ ВА ТУГМАИ ОҒОЗ ---
-@bot.message_handler(commands=["start"])
-def start(message):
-  markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-  btn = types.KeyboardButton("ОҒОЗ")
-  markup.add(btn)
-  bot.send_message(
-      message.chat.id,
-      f"Салом, {message.from_user.first_name}!\nБа боти харидории UC хуш омадед.",
-      reply_markup=markup,
-  )
-
-
-@bot.message_handler(func=lambda message: message.text in ["ОҒОЗ", "🛍 Закази нав"])
-def handle_start_button(message):
-  if message.from_user.id == ADMIN_CHAT_ID:
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn1 = types.KeyboardButton("📥 Заказҳои нав")
-    btn2 = types.KeyboardButton("✅ Заказҳои Иҷрошуда")
-    btn3 = types.KeyboardButton("❌ Заказҳои Иҷронашуда")
-    btn4 = types.KeyboardButton("📊 Статистика")
-    markup.add(btn1, btn2, btn3, btn4)
-
-    bot.send_message(
-        message.chat.id,
-        "<b>Хушомадед!</b>\nЛутфан бахшро интихоб кунед:",
-        reply_markup=markup,
-        parse_mode="HTML",
+# 1. Қадами интихоби пакет (Масалан, пас аз пахши 60 UC)
+def send_id_prompt(chat_id, package_name, price):
+    user_data[chat_id] = {"package": package_name, "price": price}
+    
+    text = (
+        f"Шумо пакети **{package_name}**-ро бо нархи **{price}** интихоб кардед. ✅\n\n"
+        f"⚠️ **Лутфан, PUBG ID-и худро бодиққат ва бехато равон кунед!**\n\n"
+        f"**Диққат:** Дар сурати иштибоҳ ворид кардани ID, масъулият бар дӯши худи шумост ва маблағ (пул) баргардонида **намешавад**. ❌\n\n"
+        f"Лутфан, ID-и худро ҳозир навишта ирсол кунед: 👇"
     )
-  else:
-    select_uc(message)
+    bot.send_message(chat_id, text, parse_mode="Markdown")
 
-
-# --- ТУГМАИ "ЗАКАЗҲОИ МАН" ---
-@bot.message_handler(func=lambda message: message.text == "📦 Заказҳои ман")
-def show_my_orders(message):
-  user_id = message.from_user.id
-  my_orders = [o for o in orders_db.values() if o["user_id"] == user_id]
-
-  if not my_orders:
-    bot.send_message(message.chat.id, "Шумо то ҳол ҳеҷ заказе надоред.")
-    return
-
-  total = len(my_orders)
-  done = sum(1 for o in my_orders if o["status"] == "done")
-  rejected = sum(1 for o in my_orders if o["status"] == "rejected")
-  pending = sum(1 for o in my_orders if o["status"] == "new")
-
-  text = (
-      f"📋 <b>ОМОРИ ЗАКАЗҲОИ ШУМО:</b>\n\n"
-      f"📦 <b>Ҷамъи заказҳо:</b> {total}\n"
-      f"⏳ <b>Дар интизорӣ:</b> {pending}\n"
-      f"✅ <b>Иҷрошуда:</b> {done}\n"
-      f"❌ <b>Иҷронашуда:</b> {rejected}"
-  )
-
-  bot.send_message(message.chat.id, text, parse_mode="HTML")
-
-
-# --- РАВАНДИ ХАРИДОРИИ UC ---
-def select_uc(message):
-  markup = types.InlineKeyboardMarkup(row_width=2)
-  btns = [
-      types.InlineKeyboardButton(
-          f"{uc} UC — {price}", callback_data=f"uc_{uc}"
-      )
-      for uc, price in PRICES.items()
-  ]
-  markup.add(*btns)
-
-  bot.send_message(
-      message.chat.id,
-      "Лутфан, миқдори UC-ро интихоб кунед:",
-      reply_markup=markup,
-  )
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("uc_"))
-def get_uc_amount(call):
-  uc_amount = call.data.split("_")[1]
-  price = PRICES.get(uc_amount, "")
-  user_data[call.from_user.id] = {"uc": uc_amount, "price": price}
-
-  msg = bot.send_message(
-      call.message.chat.id,
-      f"Шумо <b>{uc_amount} UC</b>-ро интихоб кардед.\n💰 Нарх: <b>{price}</b>\n\n"
-      f"⚠️ <b>ДИҚҚАТ:</b> Лутфан <b>PUBG ID</b>-и худро бодиққат ворид кунед.\n"
-      f"Агар ID хато бошад, UC ба аккаунти дигар меравад!",
-      parse_mode="HTML",
-  )
-  bot.register_next_step_handler(msg, process_id)
-
-
-def process_id(message):
-  user_id = message.from_user.id
-  pubg_id = message.text.strip()
-
-  if not pubg_id.isdigit():
-    msg = bot.send_message(
-        message.chat.id,
-        "❌ ID бояд танҳо аз рақамҳо иборат бошад! ID-ро дуруст нависед:",
+# 2. Қабули PUBG ID ва фиристодани реквизитҳо
+@bot.message_handler(func=lambda message: message.chat.id in user_data and "waiting_for_id" in user_data[message.chat.id])
+def receive_pubg_id(message):
+    chat_id = message.chat.id
+    pubg_id = message.text.strip()
+    
+    user_data[chat_id]["pubg_id"] = pubg_id
+    user_data[chat_id].pop("waiting_for_id") # Тоза кардани ҳолати интизори ID
+    user_data[chat_id]["waiting_for_screenshot"] = True
+    
+    pkg = user_data[chat_id]["package"]
+    price = user_data[chat_id]["price"]
+    
+    text = (
+        f"PUBG ID-и шумо: `{pubg_id}` ✅\n\n"
+        f"📦 **Пакет:** {pkg}\n"
+        f"💰 **Маблағ:** {price}\n\n"
+        f"РЕКВИЗИТИ КАРТЫ 🎫 👇\n\n"
+        f"👉 Бонки Эсхата  +992 `555050093`\n"
+        f"Ба номи Орифчон Г. М.\n\n"
+        f"👉 ДУШАНБЕ СИТИ  +992 `555050093`\n"
+        f"Ба номи Орифчон Г. М.\n\n"
+        f"👉 АЛИФ БАНК  +992 `555050093` \n"
+        f"Ба номи Орифчон Г. М.\n\n"
+        f"**Хатман чеки лозимаро (скриншот) ба ин чат фиристед!** 📸👇"
     )
-    bot.register_next_step_handler(msg, process_id)
-    return
+    bot.send_message(chat_id, text, parse_mode="Markdown")
 
-  user_data[user_id]["pubg_id"] = pubg_id
-  uc = user_data[user_id]["uc"]
-  price = user_data[user_id]["price"]
-
-  text = (
-      f"📋 <b>Маълумоти фармоиш:</b>\n\n"
-      f"🎮 <b>PUBG ID:</b> <code>{pubg_id}</code>\n"
-      f"📦 <b>Заказ:</b> {uc} UC ({price})\n\n"
-      f"💳 <b>Реквизит барои пардохт:</b>\n<code>{BANK_CARD}</code>\n\n"
-      f"⚠️ Маблағро гузаронед ва <b>акси чек (скриншот)</b>-ро фиристед:"
-  )
-  msg = bot.send_message(message.chat.id, text, parse_mode="HTML")
-  bot.register_next_step_handler(msg, process_receipt)
-
-
-def process_receipt(message):
-  global order_counter
-  user_id = message.from_user.id
-
-  if message.content_type != "photo":
-    msg = bot.send_message(
-        message.chat.id,
-        "❌ Лутфан, танҳо <b>акси чек (скриншот)</b>-ро фиристед:",
-        parse_mode="HTML",
-    )
-    bot.register_next_step_handler(msg, process_receipt)
-    return
-
-  if user_id in user_data:
-    uc_amount = user_data[user_id]["uc"]
-    price = user_data[user_id]["price"]
-    pubg_id = user_data[user_id]["pubg_id"]
-    photo_id = message.photo[-1].file_id
-
-    username = (
-        f"@{message.from_user.username}"
-        if message.from_user.username
-        else "Юзернейм надорад"
-    )
-
-    order_id = order_counter
-    orders_db[order_id] = {
-        "user_id": user_id,
-        "username": username,
-        "uc": uc_amount,
-        "price": price,
-        "pubg_id": pubg_id,
-        "photo_id": photo_id,
-        "status": "new",
-    }
-    order_counter += 1
-
-    try:
-      bot.send_message(
-          ADMIN_CHAT_ID,
-          f"🔔 <b>Закази нав қабул шуд!</b> (Закази №{order_id})",
-          parse_mode="HTML",
-      )
-
-      markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-      btn_new = types.KeyboardButton("🛍 Закази нав")
-      btn_my = types.KeyboardButton("📦 Заказҳои ман")
-      markup.add(btn_new, btn_my)
-
-      bot.send_message(
-          message.chat.id,
-          "✅ <b>Фармоиш ва чеки шумо қабул шуд!</b>\nЧек санҷида мешавад ва"
-          " ба зудӣ UC ирсол мегардад.",
-          reply_markup=markup,
-          parse_mode="HTML",
-      )
-    except Exception as e:
-      bot.send_message(message.chat.id, f"❌ Хатогӣ ҳангоми фиристодан: {e}")
-
-    del user_data[user_id]
-
-
-# --- ПАНЕЛИ ИДОРАКУНИИ БОТ ---
-@bot.message_handler(func=lambda message: message.text == "📥 Заказҳои нав")
-def show_new_orders(message):
-  if message.from_user.id != ADMIN_CHAT_ID:
-    return
-
-  new_orders = {k: v for k, v in orders_db.items() if v["status"] == "new"}
-  if not new_orders:
-    bot.send_message(message.chat.id, "Ҳоло ҳеҷ закази нав нест.")
-    return
-
-  markup = types.InlineKeyboardMarkup(row_width=1)
-  for o_id, o_data in new_orders.items():
-    btn = types.InlineKeyboardButton(
-        f"📦 Закази №{o_id} — {o_data['uc']} UC ({o_data['pubg_id']})",
-        callback_data=f"view_order_{o_id}",
-    )
-    markup.add(btn)
-
-  bot.send_message(
-      message.chat.id,
-      "📥 <b>Рӯйхати заказҳои нав:</b>",
-      reply_markup=markup,
-      parse_mode="HTML",
-  )
-
-
-@bot.message_handler(func=lambda message: message.text == "✅ Заказҳои Иҷрошуда")
-def show_done_orders(message):
-  if message.from_user.id != ADMIN_CHAT_ID:
-    return
-
-  done_orders = {k: v for k, v in orders_db.items() if v["status"] == "done"}
-  if not done_orders:
-    bot.send_message(message.chat.id, "Ҳеҷ закази иҷрошуда нест.")
-    return
-
-  markup = types.InlineKeyboardMarkup(row_width=1)
-  for o_id, o_data in done_orders.items():
-    btn = types.InlineKeyboardButton(
-        f"✅ Закази №{o_id} — {o_data['uc']} UC ({o_data['pubg_id']})",
-        callback_data=f"view_order_{o_id}",
-    )
-    markup.add(btn)
-
-  bot.send_message(
-      message.chat.id,
-      "✅ <b>Рӯйхати заказҳои иҷрошуда:</b>",
-      reply_markup=markup,
-      parse_mode="HTML",
-  )
-
-
-@bot.message_handler(
-    func=lambda message: message.text == "❌ Заказҳои Иҷронашуда"
-)
-def show_rejected_orders(message):
-  if message.from_user.id != ADMIN_CHAT_ID:
-    return
-
-  rejected_orders = {
-      k: v for k, v in orders_db.items() if v["status"] == "rejected"
-  }
-  if not rejected_orders:
-    bot.send_message(message.chat.id, "Ҳеҷ закази иҷронашуда нест.")
-    return
-
-  markup = types.InlineKeyboardMarkup(row_width=1)
-  for o_id, o_data in rejected_orders.items():
-    btn = types.InlineKeyboardButton(
-        f"❌ Закази №{o_id} — {o_data['uc']} UC ({o_data['pubg_id']})",
-        callback_data=f"view_order_{o_id}",
-    )
-    markup.add(btn)
-
-  bot.send_message(
-      message.chat.id,
-      "❌ <b>Рӯйхати заказҳои иҷронашуда:</b>",
-      reply_markup=markup,
-      parse_mode="HTML",
-  )
-
-
-@bot.message_handler(func=lambda message: message.text == "📊 Статистика")
-def show_stats(message):
-  if message.from_user.id != ADMIN_CHAT_ID:
-    return
-
-  pending_count = sum(1 for o in orders_db.values() if o["status"] == "new")
-  done_count = sum(1 for o in orders_db.values() if o["status"] == "done")
-  rejected_count = sum(
-      1 for o in orders_db.values() if o["status"] == "rejected"
-  )
-  total_count = len(orders_db)
-
-  stats_text = (
-      f"📊 <b>АМАЛИЁТ ВА СТАТИСТИКАИ БОТ:</b>\n\n"
-      f"⏳ <b>Заказҳои интизорӣ (нав):</b> {pending_count}\n"
-      f"✅ <b>Заказҳои иҷрошуда:</b> {done_count}\n"
-      f"❌ <b>Заказҳои иҷронашуда (радшуда):</b> {rejected_count}\n"
-      f"━━━━━━━━━━━━━━━━━━\n"
-      f"📈 <b>Ҷамъи ҳамаи заказҳо:</b> {total_count}"
-  )
-
-  bot.send_message(message.chat.id, stats_text, parse_mode="HTML")
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("view_order_"))
-def view_order_details(call):
-  order_id = int(call.data.split("_")[2])
-  order = orders_db.get(order_id)
-
-  if not order:
-    bot.answer_callback_query(call.id, "Заказ ёфт нашуд!")
-    return
-
-  status_map = {
-      "new": "⏳ Интизорӣ",
-      "done": "✅ Иҷро шуд",
-      "rejected": "❌ Иҷро нашуд",
-  }
-
-  caption = (
-      f"📦 <b>ЗАКАЗИ №{order_id}</b>\n\n"
-      f"👤 <b>Корбар:</b> {order['username']}\n"
-      f"🆔 <b>User ID:</b> <code>{order['user_id']}</code>\n"
-      f"🎮 <b>PUBG ID:</b> <code>{order['pubg_id']}</code>\n"
-      f"💎 <b>Миқдор:</b> <b>{order['uc']} UC</b>\n"
-      f"💰 <b>Сумма:</b> <b>{order['price']}</b>\n"
-      f"📊 <b>Статус:</b> {status_map.get(order['status'])}"
-  )
-
-  markup = types.InlineKeyboardMarkup()
-  btn_done = types.InlineKeyboardButton(
-      "1. Иҷро шуд", callback_data=f"act_done_{order_id}"
-  )
-  btn_reject = types.InlineKeyboardButton(
-      "2. Иҷро нашуд", callback_data=f"act_reject_{order_id}"
-  )
-  btn_back = types.InlineKeyboardButton(
-      "3. ⬅️ Ба қафо", callback_data=f"back_list_{order['status']}"
-  )
-
-  markup.row(btn_done, btn_reject)
-  markup.add(btn_back)
-
-  bot.send_photo(
-      call.message.chat.id,
-      order["photo_id"],
-      caption=caption,
-      reply_markup=markup,
-      parse_mode="HTML",
-  )
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("act_done_"))
-def process_order_done(call):
-  order_id = int(call.data.split("_")[2])
-  order = orders_db.get(order_id)
-
-  if order:
-    order["status"] = "done"
-
-    msg_to_user = (
-        f"✅ <b>Закази шумо ({order['uc']} UC) иҷро шуд!</b>\n\n"
-        f"Лутфан, баҳо ё отзыв гузоред 👇"
-    )
-    try:
-      bot.send_message(order["user_id"], msg_to_user, parse_mode="HTML")
-      bot.answer_callback_query(
-          call.id, "Паёми тасдиқ ба корбар фиристода шуд!"
-      )
-    except Exception:
-      bot.answer_callback_query(call.id, "Хабар ба корбар нарафт.")
-
+# 3. Қабули скриншоти чек ва фиристодан ба админ
+@bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
+def receive_screenshot(message):
+    chat_id = message.chat.id
+    file_id = message.photo[-1].file_id
+    
+    pkg = user_data[chat_id]["package"]
+    price = user_data[chat_id]["price"]
+    pubg_id = user_data[chat_id]["pubg_id"]
+    
+    user_data[chat_id].pop("waiting_for_screenshot")
+    
+    # Паём ба корбар
+    bot.reply_to(message, "Чеки шумо қабул шуд ва ба администратор фиристод شد! ⏳\nЗакази шумо дар навбат аст. Ташаккур!")
+    
+    # Тугмаҳо барои админ
     markup = types.InlineKeyboardMarkup()
-    btn_back = types.InlineKeyboardButton(
-        "3. ⬅️ Ба қафо", callback_data="back_list_done"
+    markup.add(
+        types.InlineKeyboardButton("🟢 Тасдиқ кардан", callback_data=f"approve_{chat_id}"),
+        types.InlineKeyboardButton("🔴 Рад кардан", callback_data=f"reject_{chat_id}")
     )
-    markup.add(btn_back)
-
-    bot.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        caption=call.message.caption.replace(
-            "Статус:</b> ⏳ Интизорӣ", "Статус:</b> ✅ Иҷро шуд"
-        ),
-        reply_markup=markup,
-        parse_mode="HTML",
+    
+    admin_text = (
+        f"🔔 **Закази нав ворид шуд!**\n"
+        f"👤 Корбар: @{message.from_user.username or message.from_user.first_name}\n"
+        f"🆔 PUBG ID: `{pubg_id}`\n"
+        f"📦 Пакет: {pkg}\n"
+        f"💰 Маблағ: {price}"
     )
+    bot.send_photo(ADMIN_ID, file_id, caption=admin_text, reply_markup=markup, parse_mode="Markdown")
 
+# 4. Ҷавоби админ ба заказ (Тасдиқ / Рад)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("approve_") or call.data.startswith("reject_"))
+def admin_order_handler(call):
+    action, chat_id = call.data.split("_")
+    chat_id = int(chat_id)
+    
+    if action == "approve":
+        bot.answer_callback_query(call.id, "Заказ тасдиқ шуд!")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=call.message.caption + "\n\n✅ **СТАТУС: Тасдиқ шуд**", parse_mode="Markdown")
+        
+        # Паём ба корбар бо тугмаи отзыв ва меню
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("📝 Гузоштани отзыв", callback_data="leave_review"))
+        markup.add(types.InlineKeyboardButton("🏠 Ба менюи асосӣ", callback_data="main_menu"))
+        
+        bot.send_message(chat_id, "60 юс ✅\n\nЗакази шумо бо муваффақият иҷро шуд! 🎮✨\n\nЛутфан, барои мо отзыв (фикру мулоҳиза) гузоред. Ин ба мо хеле кӯмак мекунад! 👇", reply_markup=markup)
+        
+    elif action == "reject":
+        bot.answer_callback_query(call.id, "Заказ рад карда шуд.")
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=call.message.caption + "\n\n❌ **СТАТУС: Рад шуд**", parse_mode="Markdown")
+        bot.send_message(chat_id, "Мутаассифона, закази шумо аз ҷониби админ рад карда шуд. ❌ Лутфан бо админ дар тамос шавед.")
 
-@bot.callback_query_handler(
-    func=lambda call: call.data.startswith("act_reject_")
-)
-def process_order_reject(call):
-  order_id = int(call.data.split("_")[2])
-  order = orders_db.get(order_id)
+# 5. Оғози навиштани отзыв
+@bot.callback_query_handler(func=lambda call: call.data == "leave_review")
+def review_start_callback(call):
+    chat_id = call.message.chat.id
+    attempts = user_review_attempts.get(chat_id, 0)
+    
+    if attempts >= 2:
+        bot.answer_callback_query(call.id, "Шумо лимити фиристодани отзывҳоро тамом кардед!", show_alert=True)
+        return
+        
+    user_review_attempts[chat_id] = attempts + 1
+    user_data[chat_id] = {"waiting_for_review": True}
+    bot.send_message(chat_id, "Лутфан, фикру мулоҳиза ё отзыви худро нависед: 👇")
 
-  if order:
-    order["status"] = "rejected"
-
-    msg_to_user = f"❌ <b>Закази шумо ({order['uc']} UC) иҷро нашуд!</b>"
-    try:
-      bot.send_message(order["user_id"], msg_to_user, parse_mode="HTML")
-      bot.answer_callback_query(call.id, "Хабар ба корбар фиристода шуд!")
-    except Exception:
-      bot.answer_callback_query(call.id, "Хабар ба корбар нарафт.")
-
+# Қабули матни отзыв аз корбар ва фиристодан ба админ
+@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_review"))
+def receive_review_text(message):
+    chat_id = message.chat.id
+    review_text = message.text
+    user_data[chat_id].pop("waiting_for_review")
+    
+    bot.reply_to(message, "Отвизи шумо ба админ фиристода шуд. Ташаккур! ⏳")
+    
     markup = types.InlineKeyboardMarkup()
-    btn_back = types.InlineKeyboardButton(
-        "3. ⬅️ Ба қафо", callback_data="back_list_rejected"
+    markup.add(
+        types.InlineKeyboardButton("🟢 Тасдиқ ва нашр", callback_data=f"revapp_{chat_id}"),
+        types.InlineKeyboardButton("🔴 Рад кардан", callback_data=f"revrej_{chat_id}")
     )
-    markup.add(btn_back)
-
-    bot.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        caption=call.message.caption.replace(
-            "Статус:</b> ⏳ Интизорӣ", "Статус:</b> ❌ Иҷро нашуд"
-        ),
-        reply_markup=markup,
-        parse_mode="HTML",
+    
+    admin_msg = (
+        f"📩 **Отзыви нав аз корбар:**\n"
+        f"👤 Корбар: @{message.from_user.username or message.from_user.first_name}\n"
+        f"📝 Матн: {review_text}"
     )
+    bot.send_message(ADMIN_ID, admin_msg, reply_markup=markup, parse_mode="Markdown")
+    # Матнро дар хотир нигоҳ медорем то ба канал фиристед агар тасдиқ шавад
+    user_data[chat_id]["last_review"] = review_text
 
+# 6. Қарори админ дар бораи отзыв
+@bot.callback_query_handler(func=lambda call: call.data.startswith("revapp_") or call.data.startswith("revrej_"))
+def admin_review_handler(call):
+    action, chat_id = call.data.split("_")
+    chat_id = int(chat_id)
+    
+    if action == "revapp":
+        bot.answer_callback_query(call.id, "Отзыв тасдиқ шуд!")
+        bot.edit_message_text(call.message.text + "\n\n✅ **[ТАСДИҚ КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
+        
+        # Фиристодан ба канали отзывҳо (ба ҷои @YourReviewChannel номи канали худро монед)
+        review_content = user_data.get(chat_id, {}).get("last_review", "")
+        # bot.send_message("@YourReviewChannel", f"💬 **Отзыви нав аз харидор:**\n\n{review_content}")
+        
+        bot.send_message(chat_id, "Ташаккур! Отвизи шумо аз ҷониби админ тасдиқ ва нашр шуд! 😊")
+        
+    elif action == "revrej":
+        bot.answer_callback_query(call.id, "Отзыв рад шуд.")
+        bot.edit_message_text(call.message.text + "\n\n❌ **[РАД КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
+        
+        attempts = user_review_attempts.get(chat_id, 0)
+        if attempts < 2:
+            bot.send_message(chat_id, f"Отвизи шумо аз ҷониби админ рад шуд. ❌ Шумо метавонед боз **{2 - attempts} маротиба** отзыви худро аз нав нависед ва фиристед. Барои ин тугмаи «Гузоштани отзыв»-ро пахш кунед.")
+        else:
+            bot.send_message(chat_id, "Мутаассифона, дархости отзыви шумо ду маротиба пай дар пай рад шуд. Шумо дигар лимити отзыв гузоштан надоред. 🚫")
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("back_list_"))
-def back_to_order_list(call):
-  status = call.data.split("_")[2]
-
-  if status == "new":
-    show_new_orders(call.message)
-  elif status == "done":
-    show_done_orders(call.message)
-  elif status == "rejected":
-    show_rejected_orders(call.message)
-  else:
-    bot.send_message(call.message.chat.id, "Бахш аниқ нашуд.")
-
-
-# --- ИШОРА ВА ИҶРОИ БОТ ---
-if __name__ == "__main__":
-  keep_alive()  # Оғози веб-сервер
-  print("Бот ба кор даромад...")
-  bot.infinity_polling()
+@bot.callback_query_handler(func=lambda call: call.data == "main_menu")
+def back_to_menu(call):
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "🏠 Шумо ба менюи асосӣ баргаштед. Марҳамат, хизматрасониро интихоб кунед:")
