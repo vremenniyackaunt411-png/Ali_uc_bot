@@ -146,13 +146,18 @@ def user_inline_menu(call):
         )
         contact_text = (
             "📞 **Алоқа бо администратор:**\n\n"
-            "Барои тамос ба ин профил нависед: @Admin_Username\n\n"
-            "💬 **Илтимос ба админ нависед, ӯ ҳатман ба шумо ҷавоб медиҳад!**"
+            "Дар ҳамин ҷо паём, савол ё акси худро нависед. Админ дар вақти кӯтоҳтарин ба шумо ҷавоб медиҳад! 👇"
         )
         bot.edit_message_text(contact_text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+        if chat_id not in user_data:
+            user_data[chat_id] = {}
+        user_data[chat_id]["waiting_for_admin_message"] = True
         
     elif call.data == "user_main_menu":
         bot.answer_callback_query(call.id)
+        if chat_id in user_data and "waiting_for_admin_message" in user_data[chat_id]:
+            user_data[chat_id].pop("waiting_for_admin_message")
+            
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("🛒 Харидани UC", callback_data="buy_uc_menu"),
@@ -164,6 +169,48 @@ def user_inline_menu(call):
         )
         bot.edit_message_text("Салом! Хуш омадед ба мағозаи расмии **ALI UC SHOP** 🎮🔥\n\nЛутфан яке аз тугмаҳои зеринро интихоб кунед: 👇", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
 
+# Қабули паёми корбар барои админ (матн ё расм/овоз)
+@bot.message_handler(content_types=['text', 'photo', 'voice', 'video', 'document'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_admin_message"))
+def forward_message_to_admin(message):
+    chat_id = message.chat.id
+    user_name = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
+    
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("↩️ Ҷавоб додан", callback_data=f"reply_{chat_id}"))
+    
+    forward_text = f"📩 **Паёми нав ба админ!**\n👤 Корбар: {user_name} (ID: `{chat_id}`)"
+    
+    # Фиристодани мувофиқи намуди паём
+    if message.content_type == 'text':
+        bot.send_message(ADMIN_ID, f"{forward_text}\n\n📝 Матн: {message.text}", reply_markup=markup, parse_mode="Markdown")
+    elif message.content_type == 'photo':
+        file_id = message.photo[-1].file_id
+        caption = message.caption if message.caption else ""
+        bot.send_photo(ADMIN_ID, file_id, caption=f"{forward_text}\n\n📸 Скриншот/Расм: {caption}", reply_markup=markup, parse_mode="Markdown")
+    elif message.content_type == 'voice':
+        file_id = message.voice.file_id
+        bot.send_voice(ADMIN_ID, file_id, caption=forward_text, reply_markup=markup, parse_mode="Markdown")
+    else:
+        bot.forward_message(ADMIN_ID, chat_id, message.message_id)
+        bot.send_message(ADMIN_ID, f"👆 Паёми боло аз корбар: {user_name}", reply_markup=markup)
+        
+    bot.reply_to(message, "Паёми шумо қабул шуд ва ба админ фиристода шуд! ⏳ Лутфан мутобиқи ҷавоб интизор шавед.")
+    user_data[chat_id].pop("waiting_for_admin_message")
+
+# Ҷавоб додани админ ба корбар
+@bot.callback_query_handler(func=lambda call: call.data.startswith("reply_"))
+def admin_reply_callback(call):
+    user_id = call.data.split("_")[1]
+    msg = bot.send_message(ADMIN_ID, "Лутфан, ҷавоби худро ба ин корбар нависед:")
+    bot.register_next_step_handler(msg, send_reply_to_user, user_id)
+
+def send_reply_to_user(message, user_id):
+    try:
+        bot.send_message(user_id, f"📢 **Ҷавоб аз Админ:**\n\n{message.text}")
+        bot.send_message(ADMIN_ID, "Ҷавоб бо муваффақият ба корбар фиристода шуд! ✅")
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"Хатогӣ рух дод! Шояд корбар ботро блок карда бошад.\nХатогӣ: {e}")
+
 # Интихоби пакети мушаххаси ЮС аз тарафи корбар
 @bot.callback_query_handler(func=lambda call: call.data.startswith("select_uc_"))
 def select_uc_package(call):
@@ -171,7 +218,9 @@ def select_uc_package(call):
     uc_amount = call.data.split("_")[2]
     price = UC_PACKAGES.get(uc_amount)
     
-    user_data[chat_id] = {"package": f"{uc_amount} юс", "price": price, "waiting_for_id": True}
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+    user_data[chat_id].update({"package": f"{uc_amount} юс", "price": price, "waiting_for_id": True})
     bot.answer_callback_query(call.id)
     
     markup = types.InlineKeyboardMarkup()
@@ -285,7 +334,9 @@ def review_start_callback(call):
         return
         
     user_review_attempts[chat_id] = attempts + 1
-    user_data[chat_id] = {"waiting_for_review": True}
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+    user_data[chat_id]["waiting_for_review"] = True
     
     markup = types.InlineKeyboardMarkup()
     markup.row(
