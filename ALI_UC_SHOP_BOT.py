@@ -1,9 +1,11 @@
 import telebot
 from telebot import types
 
-TOKEN = "BOT_TOKEN_IN_HERE"
-ADMIN_ID = 123456789  # Айдии админ
+# Айдии админии шумо
+ADMIN_ID = 6871575684  
 
+# Токени боти шумо
+TOKEN = "8660164143:AAGL13-xIC2pln1JKKYiPQagb2dzn6N9hhQ"
 bot = telebot.TeleBot(TOKEN)
 
 user_data = {}
@@ -13,6 +15,7 @@ user_review_attempts = {}
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
+    
     if chat_id == ADMIN_ID:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         markup.row("📦 Заказҳо", "🌟 Отзывҳо")
