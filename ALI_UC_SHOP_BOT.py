@@ -218,7 +218,7 @@ def user_inline_menu(call):
         pass
 
 # Қабули паёми корбар барои админ (бо фитри дақиқи ID-и админ)
-@bot.message_handler(content_types=['text', 'photo', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_admin_message") == True)
+@bot.message_handler(content_types=['text', 'photo', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_admin_message") == True)
 def forward_message_to_admin(message):
     chat_id = message.chat.id
     user_name = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
@@ -292,18 +292,21 @@ def select_uc_package(call):
     except Exception:
         pass
 
-# 3. Қабули PUBG ID ва реквизитҳо (бо филтри дақиқ)
-@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_id") == True)
+# 3. Қабули PUBG ID аз ҳамаи корбарон бе хатогӣ
+@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_id") == True)
 def receive_pubg_id(message):
     chat_id = message.chat.id
     pubg_id = message.text.strip()
     
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+        
     user_data[chat_id]["pubg_id"] = pubg_id
     user_data[chat_id]["waiting_for_id"] = False
     user_data[chat_id]["waiting_for_screenshot"] = True
     
-    pkg = user_data[chat_id]["package"]
-    price = user_data[chat_id]["price"]
+    pkg = user_data[chat_id].get("package", "Номаълум")
+    price = user_data[chat_id].get("price", "0")
     
     markup = types.InlineKeyboardMarkup()
     markup.row(
@@ -327,19 +330,22 @@ def receive_pubg_id(message):
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
 # 4. Пешгирии хатогӣ дар вақти интизории скриншот
-@bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot") == True)
+@bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_screenshot") == True)
 def wrong_screenshot_format(message):
     bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед ё аз тугмаҳои меню истифода баред!")
 
-# Қабули скриншот ва равон кардан ба админ
-@bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot") == True)
+# Қабули скриншот аз ҲАМАИ корбарон бо истифодаи .get() то ки хатогӣ набарояд
+@bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_screenshot") == True)
 def receive_screenshot(message):
     chat_id = message.chat.id
     file_id = message.photo[-1].file_id
     
-    pkg = user_data[chat_id]["package"]
-    price = user_data[chat_id]["price"]
-    pubg_id = user_data[chat_id]["pubg_id"]
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+        
+    pkg = user_data[chat_id].get("package", "UC")
+    price = user_data[chat_id].get("price", "-")
+    pubg_id = user_data[chat_id].get("pubg_id", "-")
     
     user_data[chat_id]["waiting_for_screenshot"] = False
     
@@ -355,9 +361,10 @@ def receive_screenshot(message):
         types.InlineKeyboardButton("🔴 Рад кардан", callback_data=f"reject_{chat_id}")
     )
     
+    user_name = message.from_user.username or message.from_user.first_name
     admin_text = (
         f"🔔 **Закази нав ворид шуд!**\n"
-        f"👤 Корбар: @{message.from_user.username or message.from_user.first_name}\n"
+        f"👤 Корбар: @{user_name}\n"
         f"🆔 PUBG ID: `{pubg_id}`\n"
         f"📦 Пакет: {pkg}\n"
         f"💰 Маблағ: {price}"
@@ -420,7 +427,7 @@ def review_start_callback(call):
     except Exception:
         pass
 
-@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_review") == True)
+@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_review") == True)
 def receive_review_text(message):
     chat_id = message.chat.id
     review_text = message.text
