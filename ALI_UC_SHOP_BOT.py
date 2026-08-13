@@ -32,11 +32,13 @@ def send_welcome(message):
     chat_id = message.chat.id
     
     if chat_id == ADMIN_ID:
+        # Барои админ панели поёнӣ мемонад, то идоракунӣ осон бошад
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         markup.row("📦 Заказҳо", "🌟 Отзывҳо")
         markup.row("⚙️ Танзими ЮС")
         bot.send_message(chat_id, "Хуш омадед, Админ! Марҳамат, бахшро интихоб кунед:", reply_markup=markup)
     else:
+        # Барои корбар ТАНҲО тугмаҳои дохили чат (Inline) бидуни клавиатураи поёнӣ
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("🛒 Харидани UC", callback_data="buy_uc_menu"),
@@ -52,9 +54,14 @@ def send_welcome(message):
             "Дар ин ҷо шумо метавонед бо нархи дастрас ва бехатар UC (ЮС) харидорӣ кунед.\n"
             "Лутфан яке аз тугмаҳои зеринро интихоб кунед: 👇"
         )
+        
+        # Барои нест кардани клавиатураи куҳнаи поёнӣ (агар монда бошад)
+        remove_markup = types.ReplyKeyboardRemove()
+        bot.send_message(chat_id, "⌛", reply_markup=remove_markup)
+        
         bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# Идоракунии тугмаҳои панели админ (Клавиатураи поёнӣ)
+# Идоракунии тугмаҳои панели админ
 @bot.message_handler(func=lambda message: message.chat.id == ADMIN_ID)
 def admin_panels(message):
     text = message.text
@@ -109,7 +116,6 @@ def user_inline_menu(call):
         for uc, price in UC_PACKAGES.items():
             markup.add(types.InlineKeyboardButton(f"💎 {uc} UC — {price}", callback_data=f"select_uc_{uc}"))
         
-        # Тугмаҳои ба қафо ва менюи асосӣ
         markup.row(
             types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
             types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
