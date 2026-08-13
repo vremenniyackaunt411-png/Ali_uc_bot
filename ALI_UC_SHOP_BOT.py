@@ -1,7 +1,7 @@
 import telebot
 from telebot import types
 from telebot.handler_backends import State, StatesGroup
-from telebot.storage import MemoryStorage
+from telebot.storage import StateMemoryStorage
 
 # Айдии админии шумо
 ADMIN_ID = 6871575684  
@@ -9,8 +9,8 @@ ADMIN_ID = 6871575684
 # Токени боти шумо
 TOKEN = "8660164143:AAGL13-xIC2pln1JKKYiPQagb2dzn6N9hhQ"
 
-# Барои идоракунии ҳолати корбарон (State Machine)
-state_storage = MemoryStorage()
+# Барои идоракунии ҳолати корбарон (State Machine) бо истифода аз StateMemoryStorage
+state_storage = StateMemoryStorage()
 bot = telebot.TeleBot(TOKEN, state_storage=state_storage)
 
 # Синфи ҳолатҳои корбар
@@ -327,7 +327,7 @@ def receive_pubg_id(message):
     )
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# 4. Агар корбар ҷои скриншот расм нафиристад
+# 4. Агар корбар ба ҷои скриншот расм нафиристад
 @bot.message_handler(state=UserStates.waiting_for_screenshot, content_types=['text', 'voice', 'video', 'document'])
 def wrong_screenshot_format(message):
     bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед!")
@@ -455,12 +455,12 @@ def admin_review_handler(call):
     try:
         if action == "revapp":
             bot.answer_callback_query(call.id, "Отзыв тасдиқ шуд!")
-            bot.edit_message_text(call.message.text + "\n\n✅ **[ТАСДИҚ КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
+            bot.edit_message_text(call.message.text + "\n\n✅ [ТАСДИҚ КАРДА ШУД]", call.message.chat.id, call.message.message_id)
             bot.send_message(chat_id, "Ташаккур! Отвизи шумо аз ҷониби админ тасдиқ ва нашр шуд! 😊")
             
         elif action == "revrej":
             bot.answer_callback_query(call.id, "Отзыв рад шуд.")
-            bot.edit_message_text(call.message.text + "\n\n❌ **[РАД КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
+            bot.edit_message_text(call.message.text + "\n\n❌ [РАД КАРДА ШУД]", call.message.chat.id, call.message.message_id)
             
             attempts = user_review_attempts.get(chat_id, 0)
             if attempts < 2:
