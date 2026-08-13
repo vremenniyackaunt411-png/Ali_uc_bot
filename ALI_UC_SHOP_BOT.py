@@ -1,4 +1,4 @@
-Import telebot
+import telebot
 from telebot import types
 
 # Айдии админии шумо
@@ -26,10 +26,19 @@ UC_PACKAGES = {
     "8100": "870 сомонӣ"
 }
 
+# Функсияи тозакунии ҳолатҳои пешпохӯрдаи корбар
+def clear_user_states(chat_id):
+    if chat_id in user_data:
+        user_data[chat_id].pop("waiting_for_id", None)
+        user_data[chat_id].pop("waiting_for_screenshot", None)
+        user_data[chat_id].pop("waiting_for_review", None)
+        user_data[chat_id].pop("waiting_for_admin_message", None)
+
 # 1. Менюи асосӣ (/start)
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
+    clear_user_states(chat_id)
     
     if chat_id == ADMIN_ID:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -142,6 +151,7 @@ def admin_delete_package(message):
 @bot.callback_query_handler(func=lambda call: call.data in ["buy_uc_menu", "my_orders", "view_reviews", "contact_admin", "user_main_menu"])
 def user_inline_menu(call):
     chat_id = call.message.chat.id
+    clear_user_states(chat_id)
     
     if call.data == "buy_uc_menu":
         bot.answer_callback_query(call.id)
@@ -162,7 +172,6 @@ def user_inline_menu(call):
             types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
             types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
         )
-        # Намоиши маълумоти охирини закази корбар агар мавҷуд бошад
         user_history = user_data.get(chat_id, {}).get("last_order_info", "Шумо то ҳол заказе надоред. ❌")
         bot.edit_message_text(f"📦 **Заказҳои охирини шумо:**\n\n{user_history}", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
         
@@ -194,9 +203,6 @@ def user_inline_menu(call):
         
     elif call.data == "user_main_menu":
         bot.answer_callback_query(call.id)
-        if chat_id in user_data and "waiting_for_admin_message" in user_data[chat_id]:
-            user_data[chat_id].pop("waiting_for_admin_message")
-            
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("🛒 Харидани UC", callback_data="buy_uc_menu"),
@@ -228,12 +234,17 @@ def forward_message_to_admin(message):
     elif message.content_type == 'voice':
         file_id = message.voice.file_id
         bot.send_voice(ADMIN_ID, file_id, caption=forward_text, reply_markup=markup, parse_mode="Markdown")
-    else:
-        bot.forward_message(ADMIN_ID, chat_id, message.message_id)
-        bot.send_message(ADMIN_ID, f"👆 Паёми боло аз корбар: {user_name}", reply_markup=markup)
+    elif message.content_type == 'video':
+        file_id = message.video.file_id
+        caption = message.caption if message.caption else ""
+        bot.send_video(ADMIN_ID, file_id, caption=f"{forward_text}\n\n📹 Видео: {caption}", reply_markup=markup, parse_mode="Markdown")
+    elif message.content_type == 'document':
+        file_id = message.document.file_id
+        caption = message.caption if message.caption else ""
+        bot.send_document(ADMIN_ID, file_id, caption=f"{forward_text}\n\n файли Ҳуҷҷат: {caption}", reply_markup=markup, parse_mode="Markdown")
         
     bot.reply_to(message, "Паёми шумо қабул шуд ва ба админ фиристода шуд! ⏳ Лутфан мутобиқи ҷавоб интизор шавед.")
-    user_data[chat_id].pop("waiting_for_admin_message")
+    user_data[chat_id].pop("waiting_for_admin_message", None)
 
 # Ҷавоб додани админ ба корбар
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reply_"))
@@ -282,7 +293,7 @@ def receive_pubg_id(message):
     pubg_id = message.text.strip()
     
     user_data[chat_id]["pubg_id"] = pubg_id
-    user_data[chat_id].pop("waiting_for_id")
+    user_data[chat_id].pop("waiting_for_id", None)
     user_data[chat_id]["waiting_for_screenshot"] = True
     
     pkg = user_data[chat_id]["package"]
@@ -309,7 +320,12 @@ def receive_pubg_id(message):
     )
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# 4. Қабули скриншот ва равон кардан ба админ
+# 4. Қабули хатогӣ, агар дар вақти интизории скриншот матн фиристанд
+@bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
+def wrong_screenshot_format(message):
+    bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед!")
+
+# Қабули скриншот ва равон кардан ба админ
 @bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
 def receive_screenshot(message):
     chat_id = message.chat.id
@@ -319,9 +335,8 @@ def receive_screenshot(message):
     price = user_data[chat_id]["price"]
     pubg_id = user_data[chat_id]["pubg_id"]
     
-    user_data[chat_id].pop("waiting_for_screenshot")
+    user_data[chat_id].pop("waiting_for_screenshot", None)
     
-    # Сабти таърихи заказ барои бахши "Заказҳои ман"
     user_data[chat_id]["last_order_info"] = f"📦 Пакет: {pkg}\n🆔 ID: `{pubg_id}`\n💰 Маблағ: {price}\n⏳ Статус: Дар навбат..."
     
     markup_user = types.InlineKeyboardMarkup()
@@ -393,11 +408,13 @@ def review_start_callback(call):
     )
     bot.edit_message_text("Лутфан, фикру мулоҳиза ё отзыви худро нависед: 👇", chat_id, call.message.message_id, reply_markup=markup)
 
+bot.edit_message_text("Лутфан, фикру мулоҳиза ё отзыви худро нависед: 👇", chat_id, call.message.message_id, reply_markup=markup)
+
 @bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_review"))
 def receive_review_text(message):
     chat_id = message.chat.id
     review_text = message.text
-    user_data[chat_id].pop("waiting_for_review")
+    user_data[chat_id].pop("waiting_for_review", None)
     
     markup_user = types.InlineKeyboardMarkup()
     markup_user.add(types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu"))
