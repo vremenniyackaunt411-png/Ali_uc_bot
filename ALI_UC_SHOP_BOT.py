@@ -26,7 +26,7 @@ UC_PACKAGES = {
     "8100": "870 сомонӣ"
 }
 
-# Функсияи тозакунии ҳолатҳои пешпохӯрдаи корбар
+# Функция барои пурра тоза кардани ҳолати корбар
 def clear_user_states(chat_id):
     if chat_id in user_data:
         user_data[chat_id].pop("waiting_for_id", None)
@@ -241,7 +241,7 @@ def forward_message_to_admin(message):
     elif message.content_type == 'document':
         file_id = message.document.file_id
         caption = message.caption if message.caption else ""
-        bot.send_document(ADMIN_ID, file_id, caption=f"{forward_text}\n\n файли Ҳуҷҷат: {caption}", reply_markup=markup, parse_mode="Markdown")
+        bot.send_document(ADMIN_ID, file_id, caption=f"{forward_text}\n\n📁 Ҳуҷҷат: {caption}", reply_markup=markup, parse_mode="Markdown")
         
     bot.reply_to(message, "Паёми шумо қабул шуд ва ба админ фиристода шуд! ⏳ Лутфан мутобиқи ҷавоб интизор шавед.")
     user_data[chat_id].pop("waiting_for_admin_message", None)
@@ -320,10 +320,10 @@ def receive_pubg_id(message):
     )
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# 4. Қабули хатогӣ, агар дар вақти интизории скриншот матн фиристанд
+# 4. Пешгирии хатогӣ дар вақти интизории скриншот
 @bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
 def wrong_screenshot_format(message):
-    bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед!")
+    bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед ё аз тугмаҳои меню истифода баред!")
 
 # Қабули скриншот ва равон кардан ба админ
 @bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
@@ -407,8 +407,6 @@ def review_start_callback(call):
         types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
     )
     bot.edit_message_text("Лутфан, фикру мулоҳиза ё отзыви худро нависед: 👇", chat_id, call.message.message_id, reply_markup=markup)
-
-bot.edit_message_text("Лутфан, фикру мулоҳиза ё отзыви худро нависед: 👇", chat_id, call.message.message_id, reply_markup=markup)
 
 @bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_review"))
 def receive_review_text(message):
