@@ -1,12 +1,24 @@
 import telebot
 from telebot import types
+from telebot.handler_backends import State, StatesGroup
+from telebot.storage import MemoryStorage
 
 # Айдии админии шумо
 ADMIN_ID = 6871575684  
 
 # Токени боти шумо
 TOKEN = "8660164143:AAGL13-xIC2pln1JKKYiPQagb2dzn6N9hhQ"
-bot = telebot.TeleBot(TOKEN)
+
+# Барои идоракунии ҳолати корбарон (State Machine)
+state_storage = MemoryStorage()
+bot = telebot.TeleBot(TOKEN, state_storage=state_storage)
+
+# Синфи ҳолатҳои корбар
+class UserStates(StatesGroup):
+    waiting_for_id = State()
+    waiting_for_screenshot = State()
+    waiting_for_admin_message = State()
+    waiting_for_review = State()
 
 user_data = {}
 user_review_attempts = {}
@@ -26,19 +38,11 @@ UC_PACKAGES = {
     "8100": "870 сомонӣ"
 }
 
-# Функсия барои пурра тоза кардани ҳолати корбар
-def clear_user_states(chat_id):
-    if chat_id in user_data:
-        user_data[chat_id].pop("waiting_for_id", None)
-        user_data[chat_id].pop("waiting_for_screenshot", None)
-        user_data[chat_id].pop("waiting_for_review", None)
-        user_data[chat_id].pop("waiting_for_admin_message", None)
-
 # 1. Менюи асосӣ (/start)
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
-    clear_user_states(chat_id)
+    bot.delete_state(chat_id) # Тоза кардани ҳолати пешинаи корбар
     
     if chat_id == ADMIN_ID:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -108,14 +112,7 @@ def admin_panels(message):
     elif text == "🗑️ Ҳазф кардани пакет":
         msg = bot.send_message(ADMIN_ID, "🗑️ Миқдори ЮСеро, ки мехоҳед ҳазф кунед, нависед (Масол: `60`):")
         bot.register_next_step_handler(msg, admin_delete_package)
-        
-    elif text in ["📋 Ҳамаи заказҳо", "📦 Заказҳои нав", "✅ Заказҳои Иҷрошуда", "❌ Заказҳои Иҷронашуда"]:
-        bot.send_message(ADMIN_ID, f"Тартиби кор бо: {text}")
-        
-    elif text in ["📋 Ҳамаи отзывҳо", "🆕 Отзывҳои нав", "✅ Отзывҳои қабулшуда", "❌ Отзывҳои радшуда"]:
-        bot.send_message(ADMIN_ID, f"Тартиби кор бо: {text}")
 
-# Функсияҳои идоракунии пакетҳо аз ҷониби админ
 def admin_add_package(message):
     try:
         parts = message.text.split(maxsplit=1)
@@ -124,7 +121,7 @@ def admin_add_package(message):
         UC_PACKAGES[uc_key] = price_val
         bot.send_message(ADMIN_ID, f"✅ Пакет бомуваффақият илова шуд!\n💎 {uc_key} UC — {price_val}")
     except Exception:
-        bot.send_message(ADMIN_ID, "❌ Хатогӣ дар ворид кардани маълумот. Лутфан дубора кӯшиш кунед.")
+        bot.send_message(ADMIN_ID, "❌ Хатогӣ дар ворид кардани маълумот.")
 
 def admin_edit_package(message):
     try:
@@ -137,7 +134,7 @@ def admin_edit_package(message):
         else:
             bot.send_message(ADMIN_ID, f"❌ Пакет бо миқдори {uc_key} ёфт нашуд.")
     except Exception:
-        bot.send_message(ADMIN_ID, "❌ Хатогӣ дар формат. Дубора кӯшиш кунед.")
+        bot.send_message(ADMIN_ID, "❌ Хатогӣ дар формат.")
 
 def admin_delete_package(message):
     uc_key = message.text.strip()
@@ -147,11 +144,11 @@ def admin_delete_package(message):
     else:
         bot.send_message(ADMIN_ID, f"❌ Чунин пакет дар рӯйхат нест.")
 
-# 2. Тугмаҳои Inline-и корбар ва идоракунии гузаришҳо бо ҳимояи try-except
+# 2. Тугмаҳои Inline-и корбар
 @bot.callback_query_handler(func=lambda call: call.data in ["buy_uc_menu", "my_orders", "view_reviews", "contact_admin", "user_main_menu"])
 def user_inline_menu(call):
     chat_id = call.message.chat.id
-    clear_user_states(chat_id)
+    bot.delete_state(chat_id)
     
     try:
         if call.data == "buy_uc_menu":
@@ -198,9 +195,7 @@ def user_inline_menu(call):
                 "Дар ҳамин ҷо паём, савол ё акси худро нависед. Админ дар вақти кӯтоҳтарин ба шумо ҷавоб медиҳад! 👇"
             )
             bot.edit_message_text(contact_text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-            if chat_id not in user_data:
-                user_data[chat_id] = {}
-            user_data[chat_id]["waiting_for_admin_message"] = True
+            bot.set_state(chat_id, UserStates.waiting_for_admin_message, chat_id)
             
         elif call.data == "user_main_menu":
             bot.answer_callback_query(call.id)
@@ -217,8 +212,8 @@ def user_inline_menu(call):
     except Exception:
         pass
 
-# Қабули паёми корбар барои админ (бо фитри дақиқи ID-и админ)
-@bot.message_handler(content_types=['text', 'photo', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_admin_message") == True)
+# Қабули паём барои админ бо States
+@bot.message_handler(state=UserStates.waiting_for_admin_message, content_types=['text', 'photo', 'voice', 'video', 'document'])
 def forward_message_to_admin(message):
     chat_id = message.chat.id
     user_name = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
@@ -247,7 +242,7 @@ def forward_message_to_admin(message):
         bot.send_document(ADMIN_ID, file_id, caption=f"{forward_text}\n\n📁 Ҳуҷҷат: {caption}", reply_markup=markup, parse_mode="Markdown")
         
     bot.reply_to(message, "Паёми шумо қабул шуд ва ба админ фиристода шуд! ⏳ Лутфан мутобиқи ҷавоб интизор шавед.")
-    user_data[chat_id]["waiting_for_admin_message"] = False
+    bot.delete_state(chat_id)
 
 # Ҷавоб додани админ ба корбар
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reply_"))
@@ -261,9 +256,9 @@ def send_reply_to_user(message, user_id):
         bot.send_message(user_id, f"📢 **Ҷавоб аз Админ:**\n\n{message.text}")
         bot.send_message(ADMIN_ID, "Ҷавоб бо муваффақият ба корбар фиристода шуд! ✅")
     except Exception as e:
-        bot.send_message(ADMIN_ID, f"Хатогӣ рух дод! Шояд корбар ботро блок карда бошад.\nХатогӣ: {e}")
+        bot.send_message(ADMIN_ID, f"Хатогӣ рух дод: {e}")
 
-# Интихоби пакети мушаххаси ЮС аз тарафи корбар
+# Интихоби пакет ва гузариш ба ҳолати интизории ID
 @bot.callback_query_handler(func=lambda call: call.data.startswith("select_uc_"))
 def select_uc_package(call):
     chat_id = call.message.chat.id
@@ -272,7 +267,11 @@ def select_uc_package(call):
     
     if chat_id not in user_data:
         user_data[chat_id] = {}
-    user_data[chat_id].update({"package": f"{uc_amount} юс", "price": price, "waiting_for_id": True})
+    user_data[chat_id]["package"] = f"{uc_amount} юс"
+    user_data[chat_id]["price"] = price
+    
+    # Танзим кардани State барои ин корбар
+    bot.set_state(chat_id, UserStates.waiting_for_id, chat_id)
     bot.answer_callback_query(call.id)
     
     markup = types.InlineKeyboardMarkup()
@@ -284,7 +283,6 @@ def select_uc_package(call):
     text = (
         f"Шумо пакети **{uc_amount} юс**-ро бо нархи **{price}** интихоб кардед. ✅\n\n"
         "⚠️ **Лутфан, PUBG ID-и худро бодиққат ва бехато равон кунед!**\n\n"
-        "**Диққат:** Дар сурати иштибоҳ ворид кардани ID, масъулият бар дӯши худи шумост ва маблағ баргардонида **намешавад**. ❌\n\n"
         "Лутфан, ID-и худро ҳозир навишта ирсол кунед: 👇"
     )
     try:
@@ -292,18 +290,18 @@ def select_uc_package(call):
     except Exception:
         pass
 
-# 3. Қабули PUBG ID аз ҳамаи корбарон бе хатогӣ
-@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_id") == True)
+# 3. Қабули PUBG ID тавассути State
+@bot.message_handler(state=UserStates.waiting_for_id)
 def receive_pubg_id(message):
     chat_id = message.chat.id
     pubg_id = message.text.strip()
     
     if chat_id not in user_data:
         user_data[chat_id] = {}
-        
     user_data[chat_id]["pubg_id"] = pubg_id
-    user_data[chat_id]["waiting_for_id"] = False
-    user_data[chat_id]["waiting_for_screenshot"] = True
+    
+    # Гузариш ба ҳолати интизории скриншот
+    bot.set_state(chat_id, UserStates.waiting_for_screenshot, chat_id)
     
     pkg = user_data[chat_id].get("package", "Номаълум")
     price = user_data[chat_id].get("price", "0")
@@ -329,13 +327,13 @@ def receive_pubg_id(message):
     )
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# 4. Пешгирии хатогӣ дар вақти интизории скриншот
-@bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_screenshot") == True)
+# 4. Агар корбар ҷои скриншот расм нафиристад
+@bot.message_handler(state=UserStates.waiting_for_screenshot, content_types=['text', 'voice', 'video', 'document'])
 def wrong_screenshot_format(message):
-    bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед ё аз тугмаҳои меню истифода баред!")
+    bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед!")
 
-# Қабули скриншот аз ҲАМАИ корбарон бо истифодаи .get() то ки хатогӣ набарояд
-@bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_screenshot") == True)
+# Қабули скриншот аз ҲАМАИ корбарон ба таври мустақил
+@bot.message_handler(state=UserStates.waiting_for_screenshot, content_types=['photo'])
 def receive_screenshot(message):
     chat_id = message.chat.id
     file_id = message.photo[-1].file_id
@@ -347,7 +345,8 @@ def receive_screenshot(message):
     price = user_data[chat_id].get("price", "-")
     pubg_id = user_data[chat_id].get("pubg_id", "-")
     
-    user_data[chat_id]["waiting_for_screenshot"] = False
+    # Тоза кардани state пас аз фиристодани чек
+    bot.delete_state(chat_id)
     
     user_data[chat_id]["last_order_info"] = f"📦 Пакет: {pkg}\n🆔 ID: `{pubg_id}`\n💰 Маблағ: {price}\n⏳ Статус: Дар навбат..."
     
@@ -402,7 +401,7 @@ def admin_order_handler(call):
     except Exception:
         pass
 
-# 6. Отзывҳо ва маҳдудияти 2 маротиба
+# 6. Отзывҳо ва маҳдудият
 @bot.callback_query_handler(func=lambda call: call.data == "leave_review")
 def review_start_callback(call):
     chat_id = call.message.chat.id
@@ -413,9 +412,7 @@ def review_start_callback(call):
         return
         
     user_review_attempts[chat_id] = attempts + 1
-    if chat_id not in user_data:
-        user_data[chat_id] = {}
-    user_data[chat_id]["waiting_for_review"] = True
+    bot.set_state(chat_id, UserStates.waiting_for_review, chat_id)
     
     markup = types.InlineKeyboardMarkup()
     markup.row(
@@ -427,11 +424,11 @@ def review_start_callback(call):
     except Exception:
         pass
 
-@bot.message_handler(func=lambda message: message.chat.id != ADMIN_ID and user_data.get(message.chat.id, {}).get("waiting_for_review") == True)
+@bot.message_handler(state=UserStates.waiting_for_review)
 def receive_review_text(message):
     chat_id = message.chat.id
     review_text = message.text
-    user_data[chat_id]["waiting_for_review"] = False
+    bot.delete_state(chat_id)
     
     markup_user = types.InlineKeyboardMarkup()
     markup_user.add(types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu"))
@@ -449,7 +446,6 @@ def receive_review_text(message):
         f"📝 Матн: {review_text}"
     )
     bot.send_message(ADMIN_ID, admin_msg, reply_markup=markup_admin, parse_mode="Markdown")
-    user_data[chat_id]["last_review"] = review_text
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("revapp_") or call.data.startswith("revrej_"))
 def admin_review_handler(call):
