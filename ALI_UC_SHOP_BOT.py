@@ -26,7 +26,7 @@ UC_PACKAGES = {
     "8100": "870 сомонӣ"
 }
 
-# Функсияи тозакунии ҳолатҳои пешпохӯрдаи корбар
+# Функсия барои пурра тоза кардани ҳолати корбар
 def clear_user_states(chat_id):
     if chat_id in user_data:
         user_data[chat_id].pop("waiting_for_id", None)
@@ -147,72 +147,75 @@ def admin_delete_package(message):
     else:
         bot.send_message(ADMIN_ID, f"❌ Чунин пакет дар рӯйхат нест.")
 
-# 2. Тугмаҳои Inline-и корбар ва идоракунии гузаришҳо
+# 2. Тугмаҳои Inline-и корбар ва идоракунии гузаришҳо бо ҳимояи try-except
 @bot.callback_query_handler(func=lambda call: call.data in ["buy_uc_menu", "my_orders", "view_reviews", "contact_admin", "user_main_menu"])
 def user_inline_menu(call):
     chat_id = call.message.chat.id
     clear_user_states(chat_id)
     
-    if call.data == "buy_uc_menu":
-        bot.answer_callback_query(call.id)
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        for uc, price in UC_PACKAGES.items():
-            markup.add(types.InlineKeyboardButton(f"💎 {uc} UC — {price}", callback_data=f"select_uc_{uc}"))
-        
-        markup.row(
-            types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
-            types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
-        )
-        bot.edit_message_text("🛒 **Марҳамат, пакети дилхоҳи ЮС-ро интихоб кунед:** 👇", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-        
-    elif call.data == "my_orders":
-        bot.answer_callback_query(call.id)
-        markup = types.InlineKeyboardMarkup()
-        markup.row(
-            types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
-            types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
-        )
-        user_history = user_data.get(chat_id, {}).get("last_order_info", "Шумо то ҳол заказе надоред. ❌")
-        bot.edit_message_text(f"📦 **Заказҳои охирини шумо:**\n\n{user_history}", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-        
-    elif call.data == "view_reviews":
-        bot.answer_callback_query(call.id)
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        markup.add(types.InlineKeyboardButton("💬 Гузаштан ба канали отзывҳо", url="https://t.me/otziv_ALI_US_SHOPP"))
-        markup.row(
-            types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
-            types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
-        )
-        bot.edit_message_text("🌟 **Канали отзывҳои мизоҷони мо:**\nМарҳамат, бо зер кардани тугмаи зерин ба канал гузаред: 👇", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-        
-    elif call.data == "contact_admin":
-        bot.answer_callback_query(call.id)
-        markup = types.InlineKeyboardMarkup()
-        markup.row(
-            types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
-            types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
-        )
-        contact_text = (
-            "📞 **Алоқа бо администратор:**\n\n"
-            "Дар ҳамин ҷо паём, савол ё акси худро нависед. Админ дар вақти кӯтоҳтарин ба шумо ҷавоб медиҳад! 👇"
-        )
-        bot.edit_message_text(contact_text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-        if chat_id not in user_data:
-            user_data[chat_id] = {}
-        user_data[chat_id]["waiting_for_admin_message"] = True
-        
-    elif call.data == "user_main_menu":
-        bot.answer_callback_query(call.id)
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        markup.add(
-            types.InlineKeyboardButton("🛒 Харидани UC", callback_data="buy_uc_menu"),
-            types.InlineKeyboardButton("📦 Заказҳои ман", callback_data="my_orders")
-        )
-        markup.add(
-            types.InlineKeyboardButton("🌟 Отзывҳо", callback_data="view_reviews"),
-            types.InlineKeyboardButton("📞 Алоқа бо админ", callback_data="contact_admin")
-        )
-        bot.edit_message_text("Салом! Хуш омадед ба мағозаи расмии **ALI UC SHOP** 🎮🔥\n\nЛутфан яке аз тугмаҳои зеринро интихоб кунед: 👇", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    try:
+        if call.data == "buy_uc_menu":
+            bot.answer_callback_query(call.id)
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            for uc, price in UC_PACKAGES.items():
+                markup.add(types.InlineKeyboardButton(f"💎 {uc} UC — {price}", callback_data=f"select_uc_{uc}"))
+            
+            markup.row(
+                types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
+                types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
+            )
+            bot.edit_message_text("🛒 **Марҳамат, пакети дилхоҳи ЮС-ро интихоб кунед:** 👇", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+            
+        elif call.data == "my_orders":
+            bot.answer_callback_query(call.id)
+            markup = types.InlineKeyboardMarkup()
+            markup.row(
+                types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
+                types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
+            )
+            user_history = user_data.get(chat_id, {}).get("last_order_info", "Шумо то ҳол заказе надоред. ❌")
+            bot.edit_message_text(f"📦 **Заказҳои охирини шумо:**\n\n{user_history}", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+            
+        elif call.data == "view_reviews":
+            bot.answer_callback_query(call.id)
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(types.InlineKeyboardButton("💬 Гузаштан ба канали отзывҳо", url="https://t.me/otziv_ALI_US_SHOPP"))
+            markup.row(
+                types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
+                types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
+            )
+            bot.edit_message_text("🌟 **Канали отзывҳои мизоҷони мо:**\nМарҳамат, бо зер кардани тугмаи зерин ба канал гузаред: 👇", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+            
+        elif call.data == "contact_admin":
+            bot.answer_callback_query(call.id)
+            markup = types.InlineKeyboardMarkup()
+            markup.row(
+                types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
+                types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
+            )
+            contact_text = (
+                "📞 **Алоқа бо администратор:**\n\n"
+                "Дар ҳамин ҷо паём, савол ё акси худро нависед. Админ дар вақти кӯтоҳтарин ба шумо ҷавоб медиҳад! 👇"
+            )
+            bot.edit_message_text(contact_text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+            if chat_id not in user_data:
+                user_data[chat_id] = {}
+            user_data[chat_id]["waiting_for_admin_message"] = True
+            
+        elif call.data == "user_main_menu":
+            bot.answer_callback_query(call.id)
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                types.InlineKeyboardButton("🛒 Харидани UC", callback_data="buy_uc_menu"),
+                types.InlineKeyboardButton("📦 Заказҳои ман", callback_data="my_orders")
+            )
+            markup.add(
+                types.InlineKeyboardButton("🌟 Отзывҳо", callback_data="view_reviews"),
+                types.InlineKeyboardButton("📞 Алоқа бо админ", callback_data="contact_admin")
+            )
+            bot.edit_message_text("Салом! Хуш омадед ба мағозаи расмии **ALI UC SHOP** 🎮🔥\n\nЛутфан яке аз тугмаҳои зеринро интихоб кунед: 👇", chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    except Exception:
+        pass
 
 # Қабули паёми корбар барои админ
 @bot.message_handler(content_types=['text', 'photo', 'voice', 'video', 'document'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_admin_message"))
@@ -241,7 +244,7 @@ def forward_message_to_admin(message):
     elif message.content_type == 'document':
         file_id = message.document.file_id
         caption = message.caption if message.caption else ""
-        bot.send_document(ADMIN_ID, file_id, caption=f"{forward_text}\n\n файли Ҳуҷҷат: {caption}", reply_markup=markup, parse_mode="Markdown")
+        bot.send_document(ADMIN_ID, file_id, caption=f"{forward_text}\n\n📁 Ҳуҷҷат: {caption}", reply_markup=markup, parse_mode="Markdown")
         
     bot.reply_to(message, "Паёми шумо қабул шуд ва ба админ фиристода шуд! ⏳ Лутфан мутобиқи ҷавоб интизор шавед.")
     user_data[chat_id].pop("waiting_for_admin_message", None)
@@ -284,7 +287,10 @@ def select_uc_package(call):
         "**Диққат:** Дар сурати иштибоҳ ворид кардани ID, масъулият бар дӯши худи шумост ва маблағ баргардонида **намешавад**. ❌\n\n"
         "Лутфан, ID-и худро ҳозир навишта ирсол кунед: 👇"
     )
-    bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    try:
+        bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
+    except Exception:
+        pass
 
 # 3. Қабули PUBG ID ва реквизитҳо
 @bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_id"))
@@ -320,10 +326,10 @@ def receive_pubg_id(message):
     )
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# 4. Қабули хатогӣ, агар дар вақти интизории скриншот матн фиристанд
+# 4. Пешгирии хатогӣ дар вақти интизории скриншот
 @bot.message_handler(content_types=['text', 'voice', 'video', 'document'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
 def wrong_screenshot_format(message):
-    bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед!")
+    bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед ё аз тугмаҳои меню истифода баред!")
 
 # Қабули скриншот ва равон кардан ба админ
 @bot.message_handler(content_types=['photo'], func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_screenshot"))
@@ -364,27 +370,30 @@ def admin_order_handler(call):
     action, chat_id = call.data.split("_")
     chat_id = int(chat_id)
     
-    if action == "approve":
-        bot.answer_callback_query(call.id, "Заказ тасдиқ шуд!")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=call.message.caption + "\n\n✅ **СТАТУС: Тасдиқ шуд**", parse_mode="Markdown")
-        
-        if chat_id in user_data:
-            user_data[chat_id]["last_order_info"] = user_data[chat_id].get("last_order_info", "").replace("⏳ Статус: Дар навбат...", "✅ Статус: Иҷро шуд 🎉")
-        
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("📝 Гузоштани отзыв", callback_data="leave_review"))
-        markup.add(types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu"))
-        
-        bot.send_message(chat_id, "Закази шумо бо муваффақият иҷро шуд! 🎮✨\n\nЛутфан, барои мо отзыв гузоред:", reply_markup=markup)
-        
-    elif action == "reject":
-        bot.answer_callback_query(call.id, "Заказ рад карда шуд.")
-        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=call.message.caption + "\n\n❌ **СТАТУС: Рад шуд**", parse_mode="Markdown")
-        
-        if chat_id in user_data:
-            user_data[chat_id]["last_order_info"] = user_data[chat_id].get("last_order_info", "").replace("⏳ Статус: Дар навбат...", "❌ Статус: Рад шуд")
+    try:
+        if action == "approve":
+            bot.answer_callback_query(call.id, "Заказ тасдиқ шуд!")
+            bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=call.message.caption + "\n\n✅ **СТАТУС: Тасдиқ шуд**", parse_mode="Markdown")
             
-        bot.send_message(chat_id, "Мутаассифона, закази шумо аз ҷониби админ рад карда шуд. ❌")
+            if chat_id in user_data:
+                user_data[chat_id]["last_order_info"] = user_data[chat_id].get("last_order_info", "").replace("⏳ Статус: Дар навбат...", "✅ Статус: Иҷро шуд 🎉")
+            
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("📝 Гузоштани отзыв", callback_data="leave_review"))
+            markup.add(types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu"))
+            
+            bot.send_message(chat_id, "Закази шумо бо муваффақият иҷро шуд! 🎮✨\n\nЛутфан, барои мо отзыв гузоред:", reply_markup=markup)
+            
+        elif action == "reject":
+            bot.answer_callback_query(call.id, "Заказ рад карда шуд.")
+            bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=call.message.caption + "\n\n❌ **СТАТУС: Рад шуд**", parse_mode="Markdown")
+            
+            if chat_id in user_data:
+                user_data[chat_id]["last_order_info"] = user_data[chat_id].get("last_order_info", "").replace("⏳ Статус: Дар навбат...", "❌ Статус: Рад шуд")
+                
+            bot.send_message(chat_id, "Мутаассифона, закази шумо аз ҷониби админ рад карда шуд. ❌")
+    except Exception:
+        pass
 
 # 6. Отзывҳо ва маҳдудияти 2 маротиба
 @bot.callback_query_handler(func=lambda call: call.data == "leave_review")
@@ -406,7 +415,10 @@ def review_start_callback(call):
         types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
         types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
     )
-    bot.edit_message_text("Лутфан, фикру мулоҳиза ё отзыви худро нависед: 👇", chat_id, call.message.message_id, reply_markup=markup)
+    try:
+        bot.edit_message_text("Лутфан, фикру мулоҳиза ё отзыви худро нависед: 👇", chat_id, call.message.message_id, reply_markup=markup)
+    except Exception:
+        pass
 
 @bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get("waiting_for_review"))
 def receive_review_text(message):
@@ -437,19 +449,22 @@ def admin_review_handler(call):
     action, chat_id = call.data.split("_")
     chat_id = int(chat_id)
     
-    if action == "revapp":
-        bot.answer_callback_query(call.id, "Отзыв тасдиқ шуд!")
-        bot.edit_message_text(call.message.text + "\n\n✅ **[ТАСДИҚ КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
-        bot.send_message(chat_id, "Ташаккур! Отвизи шумо аз ҷониби админ тасдиқ ва нашр шуд! 😊")
-        
-    elif action == "revrej":
-        bot.answer_callback_query(call.id, "Отзыв рад шуд.")
-        bot.edit_message_text(call.message.text + "\n\n❌ **[РАД КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
-        
-        attempts = user_review_attempts.get(chat_id, 0)
-        if attempts < 2:
-            bot.send_message(chat_id, f"Отвизи шумо рад шуд. ❌ Шумо метавонед боз **{2 - attempts} маротиба** отзыви худро фиристед.")
-        else:
-            bot.send_message(chat_id, "Мутаассифона, лимити отзыв гузоштани шумо тамом шуд. 🚫")
+    try:
+        if action == "revapp":
+            bot.answer_callback_query(call.id, "Отзыв тасдиқ шуд!")
+            bot.edit_message_text(call.message.text + "\n\n✅ **[ТАСДИҚ КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
+            bot.send_message(chat_id, "Ташаккур! Отвизи шумо аз ҷониби админ тасдиқ ва нашр шуд! 😊")
+            
+        elif action == "revrej":
+            bot.answer_callback_query(call.id, "Отзыв рад шуд.")
+            bot.edit_message_text(call.message.text + "\n\n❌ **[РАД КАРДА ШУД]**", call.message.chat.id, call.message.message_id)
+            
+            attempts = user_review_attempts.get(chat_id, 0)
+            if attempts < 2:
+                bot.send_message(chat_id, f"Отвизи шумо рад шуд. ❌ Шумо метавонед боз **{2 - attempts} маротиба** отзыви худро фиристед.")
+            else:
+                bot.send_message(chat_id, "Мутаассифона, лимити отзыв гузоштани шумо тамом шуд. 🚫")
+    except Exception:
+        pass
 
 bot.infinity_polling()
