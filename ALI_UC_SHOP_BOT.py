@@ -9,11 +9,11 @@ TOKEN = "8660164143:AAGL13-xIC2pln1JKKYiPQagb2dzn6N9hhQ"
 state_storage = StateMemoryStorage()
 bot = telebot.TeleBot(TOKEN, state_storage=state_storage)
 
-# --- БАЗАИ МАЪЛУМОТИ ХОТИРАВӢ (IN-MEMORY DB) ---
-users_db = {}  # {chat_id: {"name": str, "username": str, "orders_count": int, "approved_orders": int, "rejected_orders": int}}
-orders_db = [] # [{"id": int, "user_id": int, "user_name": str, "pubg_id": str, "uc": int, "price": int, "file_id": str, "status": str, "reason": str}]
-reviews_db = [] # [{"id": int, "user_id": int, "user_name": str, "text": str, "status": str, "reason": str}]
-cart_db = {} # {chat_id: {"uc": int, "price": int}}
+# --- БАЗАИ МАЪЛУМОТИ ХОТИРАВӢ ---
+users_db = {}
+orders_db = []
+reviews_db = []
+cart_db = {}
 
 UC_PACKAGES = {
     60: 10,
@@ -46,7 +46,7 @@ class AdminStates(StatesGroup):
     waiting_for_delete_package = State()
     waiting_for_edit_package = State()
 
-# --- ВСЕОБЩИЕ ФУНКСИЯҲОИ МЕНЮ ---
+# --- МЕНЮИ АСОСӢ ---
 def get_user_main_markup():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -75,7 +75,6 @@ def register_user_if_not_exists(user):
             "rejected_orders": 0
         }
 
-# Функсияи махсус барои намоиши менюи харид ва сабад
 def show_buy_uc_menu(chat_id, message_id):
     if chat_id not in cart_db:
         cart_db[chat_id] = {"uc": 0, "price": 0}
@@ -83,27 +82,23 @@ def show_buy_uc_menu(chat_id, message_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
     sorted_packages = dict(sorted(UC_PACKAGES.items()))
     
-    # 1. Тугмаҳои бастаҳои ЮС
     for uc, pr in sorted_packages.items():
         markup.add(types.InlineKeyboardButton(f"💎 {uc} UC — {pr} сомонӣ", callback_data=f"add_cart_{uc}_{pr}"))
     
     curr_uc = cart_db[chat_id]["uc"]
     curr_pr = cart_db[chat_id]["price"]
     
-    # 2. Сатри нав: Нишондиҳандаи миқдори умумии UC ва Маблағ
     cart_info_btn = types.InlineKeyboardButton(
         f"🛒 Ҷамъ: {curr_uc} UC — {curr_pr} сомонӣ", 
         callback_data="cart_no_action"
     )
     markup.row(cart_info_btn)
     
-    # 3. Тугмаҳои Очистить ва Харидан
     markup.row(
         types.InlineKeyboardButton("🗑️ Очистить", callback_data="cart_clear"),
         types.InlineKeyboardButton("✅ Харидан", callback_data="cart_checkout")
     )
     
-    # 4. Тугмаҳои Навигация
     markup.row(
         types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_main_menu"),
         types.InlineKeyboardButton("🏠 Менюи асосӣ", callback_data="user_main_menu")
@@ -116,7 +111,7 @@ def show_buy_uc_menu(chat_id, message_id):
     except telebot.apihelper.ApiTelegramException:
         pass
 
-# --- 1. СТАРТ ---
+# --- СТАРТ ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     chat_id = message.chat.id
@@ -133,7 +128,7 @@ def start_cmd(message):
         )
         bot.send_message(chat_id, text, reply_markup=get_user_main_markup(), parse_mode="Markdown")
 
-# ==================== СЕНАРИЯИ КОРБАР ====================
+# ==================== ИСЛОҲИ СЕНАРИЯИ КОРБАР ====================
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("user_") or call.data.startswith("add_cart_") or call.data in ["cart_clear", "cart_checkout", "cart_no_action"])
 def user_callback_handler(call):
@@ -178,7 +173,9 @@ def user_callback_handler(call):
             bot.answer_callback_query(call.id, "⚠️ Лутфан аввал миқдори ЮС-ро интихоб кунед!", show_alert=True)
             return
         
+        # Гузаштан ба ҳолати дохил кардани PUBG ID
         bot.set_state(chat_id, UserStates.waiting_for_pubg_id, chat_id)
+        
         markup = types.InlineKeyboardMarkup()
         markup.row(
             types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_buy_uc"),
@@ -235,18 +232,19 @@ def user_callback_handler(call):
         )
         bot.send_message(chat_id, "Лутфан, отзыватонро гузоред: 👇", reply_markup=markup)
 
-# Интизории PUBG ID
-@bot.message_handler(state=UserStates.waiting_for_pubg_id)
+# 1️⃣ ҚАДАМИ 1: Қабули PUBG ID
+@bot.message_handler(state=UserStates.waiting_for_pubg_id, content_types=['text'])
 def process_pubg_id(message):
     chat_id = message.chat.id
     pubg_id = message.text.strip()
     
+    # Сабт кардани PUBG ID дар State
+    bot.set_state(chat_id, UserStates.waiting_for_receipt, chat_id)
     with bot.retrieve_data(chat_id, chat_id) as data:
         data['pubg_id'] = pubg_id
 
     cart_info = cart_db.get(chat_id, {"uc": 0, "price": 0})
     
-    bot.set_state(chat_id, UserStates.waiting_for_receipt, chat_id)
     markup = types.InlineKeyboardMarkup()
     markup.row(
         types.InlineKeyboardButton("⬅️ Ба қафо", callback_data="user_buy_uc"),
@@ -264,15 +262,18 @@ def process_pubg_id(message):
     )
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# Интизории Скриншот
+# 2️⃣ ҚАДАМИ 2: Қабули Чек (Скриншот)
 @bot.message_handler(state=UserStates.waiting_for_receipt, content_types=['photo'])
 def process_receipt(message):
     chat_id = message.chat.id
     file_id = message.photo[-1].file_id
     
-    pubg_id = ""
-    with bot.retrieve_data(chat_id, chat_id) as data:
-        pubg_id = data.get('pubg_id', 'Номаълум')
+    pubg_id = "Номаълум"
+    try:
+        with bot.retrieve_data(chat_id, chat_id) as data:
+            pubg_id = data.get('pubg_id', 'Номаълум')
+    except Exception:
+        pass
         
     cart_info = cart_db.get(chat_id, {"uc": 0, "price": 0})
     bot.delete_state(chat_id, chat_id)
@@ -292,7 +293,7 @@ def process_receipt(message):
     })
     
     users_db[chat_id]["orders_count"] += 1
-    cart_db[chat_id] = {"uc": 0, "price": 0}
+    cart_db[chat_id] = {"uc": 0, "price": 0} # Холӣ кардани сабад пас аз муваффақият
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("ба менюи асоси", callback_data="user_main_menu"))
@@ -304,14 +305,21 @@ def process_receipt(message):
         types.InlineKeyboardButton("ичро шуд", callback_data=f"adm_app_{order_id}"),
         types.InlineKeyboardButton("ичро нашуд", callback_data=f"adm_rej_{order_id}")
     )
-    adm_txt = f"🔔 **Закази нав №{order_id}**\nЧек: [Дар акс]\nКорбар: {user_name} (`{chat_id}`)\nНикнейм: @{message.from_user.username if message.from_user.username else 'Номаълум'}\nмикдори юс: {cart_info['uc']}\nмикдори маблаг: {cart_info['price']} сомонӣ\nPUBG ID: `{pubg_id}`"
+    adm_txt = (
+        f"🔔 **Закази нав №{order_id}**\n"
+        f"Корбар: {user_name} (`{chat_id}`)\n"
+        f"Никнейм: @{message.from_user.username if message.from_user.username else 'Номаълум'}\n"
+        f"микдори юс: {cart_info['uc']}\n"
+        f"микдори маблаг: {cart_info['price']} сомонӣ\n"
+        f"PUBG ID: `{pubg_id}`"
+    )
     bot.send_photo(ADMIN_ID, file_id, caption=adm_txt, reply_markup=admin_markup, parse_mode="Markdown")
 
 @bot.message_handler(state=UserStates.waiting_for_receipt, content_types=['text', 'voice', 'document'])
 def process_receipt_wrong(message):
     bot.reply_to(message, "⚠️ Лутфан танҳо **чекро (расм)** равон кунед!")
 
-# Интизории паём ба Админ
+# Паём ба Админ
 @bot.message_handler(state=UserStates.waiting_for_admin_msg, content_types=['text', 'photo', 'voice'])
 def process_user_msg_to_admin(message):
     chat_id = message.chat.id
@@ -331,7 +339,7 @@ def process_user_msg_to_admin(message):
         
     bot.reply_to(message, "дар хаминчон нависед админ хатман ба шумо чавоб медихад.")
 
-# Интизории отзыв
+# Отзыв
 @bot.message_handler(state=UserStates.waiting_for_review)
 def process_user_review(message):
     chat_id = message.chat.id
@@ -359,12 +367,11 @@ def process_user_review(message):
     markup.add(types.InlineKeyboardButton("ба менюи асоси", callback_data="user_main_menu"))
     bot.send_message(chat_id, "Отзыви шумо фиристода шуд!", reply_markup=markup)
 
-# ==================== СЕНАРИЯИ АДМИН ====================
+# ==================== АДМИН СЕНАРИЯСИ ====================
 
 @bot.message_handler(func=lambda m: m.chat.id == ADMIN_ID and m.text in ["📦 Заказҳо", "🌟 Отзывҳо", "🏆 Корбарони муваффақ", "⚙️ Танзими ЮС"])
 def admin_menu_handler(message):
     text = message.text
-    
     if text == "📦 Заказҳо":
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         markup.row("1. заказхои нав", "2. хамаи заказхо")
@@ -382,18 +389,15 @@ def admin_menu_handler(message):
     elif text == "🏆 Корбарони муваффақ":
         sorted_users = sorted(users_db.items(), key=lambda x: x[1]['approved_orders'], reverse=True)
         markup = types.InlineKeyboardMarkup(row_width=1)
-        
         for u_id, u_data in sorted_users:
             btn_txt = f"👤 {u_data['name']} | Заказҳо: {u_data['approved_orders']}"
             markup.add(types.InlineKeyboardButton(btn_txt, callback_data=f"adm_user_info_{u_id}"))
-            
         markup.add(types.InlineKeyboardButton("паём ба хама", callback_data="adm_broadcast_all"))
         bot.send_message(ADMIN_ID, "3 Корбарони мувафак:", reply_markup=markup)
 
     elif text == "⚙️ Танзими ЮС":
         sorted_packages = dict(sorted(UC_PACKAGES.items()))
         pkg_str = "\n".join([f"💎 {uc} UC — {pr} сомонӣ" for uc, pr in sorted_packages.items()])
-        
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("1 илова кардани пакет", callback_data="pkg_add"),
@@ -412,33 +416,27 @@ def admin_submenus(message):
         bot.send_message(ADMIN_ID, "Админ старт", reply_markup=get_admin_main_markup())
         return
 
-    # Заказҳо
     if txt in ["1. заказхои нав", "2. хамаи заказхо", "3. заказхои Ичрошуда", "4. заказхои радшуда"]:
         st_map = {"1. заказхои нав": "Нав", "2. хамаи заказхо": "ALL", "3. заказхои Ичрошуда": "Иҷро шуд", "4. заказхои радшуда": "Рад шуд"}
         target_st = st_map[txt]
-        
         markup = types.InlineKeyboardMarkup(row_width=2)
         for o in orders_db:
             if target_st == "ALL" or o["status"] == target_st:
                 markup.add(types.InlineKeyboardButton(f"Закази №{o['id']}", callback_data=f"view_ord_{o['id']}"))
         bot.send_message(ADMIN_ID, f"Рӯйхат: {txt}", reply_markup=markup)
 
-    # Отзывҳо
     elif txt in ["1. отзывхои нав", "2. хамаи отзывхо", "3. отзывхои кабулшуда", "4. отзывхои радшуда"]:
         st_map = {"1. отзывхои нав": "Нав", "2. хамаи отзывхо": "ALL", "3. отзывхои кабулшуда": "Қабул шуд", "4. отзывхои радшуда": "Рад шуд"}
         target_st = st_map[txt]
-        
         markup = types.InlineKeyboardMarkup(row_width=2)
         for r in reviews_db:
             if target_st == "ALL" or r["status"] == target_st:
                 markup.add(types.InlineKeyboardButton(f"Отзыви №{r['id']}", callback_data=f"view_rev_{r['id']}"))
         bot.send_message(ADMIN_ID, f"Рӯйхат: {txt}", reply_markup=markup)
 
-# ИДОРАКУНИИ CALLBACK-ҲОИ АДМИН
 @bot.callback_query_handler(func=lambda call: call.message.chat.id == ADMIN_ID)
 def admin_callbacks(call):
     data = call.data
-    
     if data == "adm_back_to_main":
         bot.send_message(ADMIN_ID, "Админ старт", reply_markup=get_admin_main_markup())
 
@@ -446,17 +444,16 @@ def admin_callbacks(call):
         o_id = int(data.split("_")[2])
         o = next((x for x in orders_db if x["id"] == o_id), None)
         if o:
-            msg_txt = f"Чек: [Акс]\nкорбар: {o['user_name']}\nном никнейм: @{users_db.get(o['user_id'], {}).get('username', 'Номаълум')}\nмикдори юс: {o['uc']}\nмикдори маблаг: {o['price']} сомонӣ\nСтатус: {o['status']}"
+            msg_txt = f"Чек: [Акс]\nкорбар: {o['user_name']}\nном никнейм: @{users_db.get(o['user_id'], {}).get('username', 'Номаълум')}\nмикдори юс: {o['uc']}\nмикдори маблаг: {o['price']} сомонӣ\nPUBG ID: `{o['pubg_id']}`\nСтатус: {o['status']}"
             if o['reason']:
                 msg_txt += f"\nСабаб: {o['reason']}"
-            
             markup = types.InlineKeyboardMarkup()
             if o['status'] == "Нав":
                 markup.add(
                     types.InlineKeyboardButton("ичро шуд", callback_data=f"adm_app_{o['id']}"),
                     types.InlineKeyboardButton("ичро нашуд", callback_data=f"adm_rej_{o['id']}")
                 )
-            bot.send_photo(ADMIN_ID, o['file_id'], caption=msg_txt, reply_markup=markup)
+            bot.send_photo(ADMIN_ID, o['file_id'], caption=msg_txt, reply_markup=markup, parse_mode="Markdown")
 
     elif data.startswith("adm_app_"):
         o_id = int(data.split("_")[2])
@@ -464,10 +461,7 @@ def admin_callbacks(call):
         if o:
             o["status"] = "Иҷро шуд"
             users_db[o["user_id"]]["approved_orders"] += 1
-            
             bot.answer_callback_query(call.id, "Иҷро шуд!")
-            
-            # Ба корбар
             usr_markup = types.InlineKeyboardMarkup()
             usr_markup.add(
                 types.InlineKeyboardButton("гузоштани отзыв", callback_data="user_leave_review"),
@@ -482,7 +476,6 @@ def admin_callbacks(call):
             state_data['target_order_id'] = o_id
         bot.send_message(ADMIN_ID, "Сабаби ичро нашуданро нависед:")
 
-    # Отзывҳо
     elif data.startswith("view_rev_"):
         r_id = int(data.split("_")[2])
         r = next((x for x in reviews_db if x["id"] == r_id), None)
@@ -513,12 +506,10 @@ def admin_callbacks(call):
             state_data['target_review_id'] = r_id
         bot.send_message(ADMIN_ID, "Сабабашро нависед:")
 
-    # Корбарон ва паёмҳо
     elif data.startswith("adm_user_info_"):
         u_id = int(data.split("_")[3])
         u = users_db.get(u_id, {})
         text = f"Корбар ном: {u.get('name')}\nникнейм: {u.get('username')}\nмикдори заказхо: {u.get('orders_count')}"
-        
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("паём ба корбар", callback_data=f"send_direct_msg_{u_id}"))
         markup.add(types.InlineKeyboardButton("ба кафо", callback_data="adm_back_to_main"))
@@ -542,7 +533,6 @@ def admin_callbacks(call):
             state_data['reply_user_id'] = u_id
         bot.send_message(ADMIN_ID, "Ҷавоби худро нависед:")
 
-    # Танзими пакетҳо
     elif data == "pkg_add":
         bot.set_state(ADMIN_ID, AdminStates.waiting_for_add_package, ADMIN_ID)
         bot.send_message(ADMIN_ID, "микдори юс ва маблағро бо фосила равон кунед (Масал: `90 15`):", parse_mode="Markdown")
@@ -555,7 +545,6 @@ def admin_callbacks(call):
         bot.set_state(ADMIN_ID, AdminStates.waiting_for_edit_package, ADMIN_ID)
         bot.send_message(ADMIN_ID, "авал микдори юс ва микдори маблаг равон кунед (Масал: `60 12`):", parse_mode="Markdown")
 
-# ХАНДЛЕРҲОИ ИНТИЗОРИИ АДМИН (STATES)
 @bot.message_handler(state=AdminStates.waiting_for_reject_reason)
 def process_order_reject_reason(message):
     reason = message.text
@@ -563,13 +552,11 @@ def process_order_reject_reason(message):
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         o_id = data.get('target_order_id')
     bot.delete_state(ADMIN_ID, ADMIN_ID)
-    
     o = next((x for x in orders_db if x["id"] == o_id), None)
     if o:
         o["status"] = "Рад шуд"
         o["reason"] = reason
         users_db[o["user_id"]]["rejected_orders"] += 1
-        
         usr_markup = types.InlineKeyboardMarkup()
         usr_markup.add(types.InlineKeyboardButton("ба менюи асоси", callback_data="user_main_menu"))
         bot.send_message(o["user_id"], f"закази шумо рад шуд.\nСабабаш  {reason}", reply_markup=usr_markup)
@@ -582,7 +569,6 @@ def process_review_reject_reason(message):
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         r_id = data.get('target_review_id')
     bot.delete_state(ADMIN_ID, ADMIN_ID)
-    
     r = next((x for x in reviews_db if x["id"] == r_id), None)
     if r:
         r["status"] = "Рад шуд"
@@ -601,7 +587,6 @@ def process_admin_reply(message):
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         u_id = data.get('reply_user_id')
     bot.delete_state(ADMIN_ID, ADMIN_ID)
-    
     try:
         bot.send_message(u_id, f"💬 **Ҷавоб аз админ:**\n\n{message.text}")
         bot.send_message(ADMIN_ID, "Ҷавоб гардонида шуд!")
@@ -614,7 +599,6 @@ def process_direct_msg(message):
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         u_id = data.get('target_user_id')
     bot.delete_state(ADMIN_ID, ADMIN_ID)
-    
     try:
         bot.send_message(u_id, message.text)
         bot.send_message(ADMIN_ID, "Паём фиристода шуд!")
