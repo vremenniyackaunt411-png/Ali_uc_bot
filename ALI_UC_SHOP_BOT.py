@@ -28,7 +28,7 @@ keep_alive()
 
 # ==================== ТАНЗИМОТИ БОТ ====================
 ADMIN_ID = 6871575684  
-TOKEN = "8660164143:AAGL13-xIC2pln1JKKYiPQagb2dzn6N9hhQ"
+TOKEN = "8660164143:AAHcjEYPXofxRfli_5rhbzoHVjMo-zHOgA4"
 
 state_storage = StateMemoryStorage()
 bot = telebot.TeleBot(TOKEN, state_storage=state_storage)
