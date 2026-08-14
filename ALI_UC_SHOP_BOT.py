@@ -70,8 +70,8 @@ def send_welcome(message):
         bot.send_message(chat_id, "⌛", reply_markup=remove_markup)
         bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# Идоракунии тугмаҳои панели админ
-@bot.message_handler(func=lambda message: message.chat.id == ADMIN_ID)
+# Идоракунии тугмаҳои панели админ (Танҳо барои матнҳое ки дар State нестанд)
+@bot.message_handler(func=lambda message: message.chat.id == ADMIN_ID and message.text in ["📦 Заказҳо", "🌟 Отзывҳо", "⚙️ Танзими ЮС", "🏠 Ба менюи асосӣ", "➕ Илова кардани пакет", "✏️ Иваз кардани нарх", "🗑️ Ҳазф кардани пакет"])
 def admin_panels(message):
     text = message.text
     
@@ -327,12 +327,12 @@ def receive_pubg_id(message):
     )
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# 4. Агар корбар ба ҷои скриншот расм нафиристад
+# 4. Агар корбар ба ҷои скриншот чизе дигар нависад
 @bot.message_handler(state=UserStates.waiting_for_screenshot, content_types=['text', 'voice', 'video', 'document'])
 def wrong_screenshot_format(message):
     bot.reply_to(message, "⚠️ Лутфан танҳо **скриншоти чеки пардохт (расм)**-ро ба чат фиристед!")
 
-# Қабули скриншот аз ҲАМАИ корбарон ба таври мустақил
+# Қабули скриншот
 @bot.message_handler(state=UserStates.waiting_for_screenshot, content_types=['photo'])
 def receive_screenshot(message):
     chat_id = message.chat.id
