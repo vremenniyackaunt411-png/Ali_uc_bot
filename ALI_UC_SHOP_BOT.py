@@ -15,16 +15,12 @@ def home():
     return "Bot runs 24/7!"
 
 def run():
-    # Render худаш PORT-ро ба таври автоматикӣ медиҳад
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
     t = Thread(target=run)
     t.start()
-
-# Ишғол кардани порт пеш аз оғози бот
-keep_alive()
 
 # ==================== ТАНЗИМОТИ БОТ ====================
 ADMIN_ID = 6871575684  
@@ -139,7 +135,11 @@ def show_buy_uc_menu(chat_id, message_id):
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     chat_id = message.chat.id
-    bot.delete_state(chat_id, chat_id)
+    try:
+        bot.delete_state(chat_id, chat_id)
+    except Exception:
+        pass
+        
     register_user_if_not_exists(message.from_user)
 
     if chat_id == ADMIN_ID:
@@ -165,7 +165,10 @@ def user_callback_handler(call):
         return
 
     elif call.data == "user_main_menu":
-        bot.delete_state(chat_id, chat_id)
+        try:
+            bot.delete_state(chat_id, chat_id)
+        except Exception:
+            pass
         bot.edit_message_text("Салом! Хуш омадед ба мағозаи расмии **ALI UC SHOP** 🎮🔥\n\nЛутфан яке аз тугмаҳои зеринро интихоб кунед: 👇",
                               chat_id, call.message.message_id, reply_markup=get_user_main_markup(), parse_mode="Markdown")
 
@@ -260,9 +263,10 @@ def process_pubg_id(message):
     chat_id = message.chat.id
     pubg_id = message.text.strip()
     
-    bot.set_state(chat_id, UserStates.waiting_for_receipt, chat_id)
     with bot.retrieve_data(chat_id, chat_id) as data:
         data['pubg_id'] = pubg_id
+    
+    bot.set_state(chat_id, UserStates.waiting_for_receipt, chat_id)
 
     cart_info = cart_db.get(chat_id, {"uc": 0, "price": 0})
     
@@ -297,7 +301,10 @@ def process_receipt(message):
         pass
         
     cart_info = cart_db.get(chat_id, {"uc": 0, "price": 0})
-    bot.delete_state(chat_id, chat_id)
+    try:
+        bot.delete_state(chat_id, chat_id)
+    except Exception:
+        pass
     
     order_id = len(orders_db) + 1
     user_name = message.from_user.first_name
@@ -342,7 +349,10 @@ def process_receipt_wrong(message):
 @bot.message_handler(state=UserStates.waiting_for_admin_msg, content_types=['text', 'photo', 'voice'])
 def process_user_msg_to_admin(message):
     chat_id = message.chat.id
-    bot.delete_state(chat_id, chat_id)
+    try:
+        bot.delete_state(chat_id, chat_id)
+    except Exception:
+        pass
     
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("чавоб додан", callback_data=f"reply_to_user_{chat_id}"))
@@ -361,7 +371,10 @@ def process_user_msg_to_admin(message):
 @bot.message_handler(state=UserStates.waiting_for_review)
 def process_user_review(message):
     chat_id = message.chat.id
-    bot.delete_state(chat_id, chat_id)
+    try:
+        bot.delete_state(chat_id, chat_id)
+    except Exception:
+        pass
     
     rev_id = len(reviews_db) + 1
     reviews_db.append({
@@ -568,7 +581,10 @@ def process_order_reject_reason(message):
     o_id = None
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         o_id = data.get('target_order_id')
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     o = next((x for x in orders_db if x["id"] == o_id), None)
     if o:
         o["status"] = "Рад шуд"
@@ -585,7 +601,10 @@ def process_review_reject_reason(message):
     r_id = None
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         r_id = data.get('target_review_id')
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     r = next((x for x in reviews_db if x["id"] == r_id), None)
     if r:
         r["status"] = "Рад шуд"
@@ -603,7 +622,10 @@ def process_admin_reply(message):
     u_id = None
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         u_id = data.get('reply_user_id')
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     try:
         bot.send_message(u_id, f"💬 **Ҷавоб аз админ:**\n\n{message.text}")
         bot.send_message(ADMIN_ID, "Ҷавоб гардонида шуд!")
@@ -615,7 +637,10 @@ def process_direct_msg(message):
     u_id = None
     with bot.retrieve_data(ADMIN_ID, ADMIN_ID) as data:
         u_id = data.get('target_user_id')
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     try:
         bot.send_message(u_id, message.text)
         bot.send_message(ADMIN_ID, "Паём фиристода шуд!")
@@ -624,7 +649,10 @@ def process_direct_msg(message):
 
 @bot.message_handler(state=AdminStates.waiting_for_broadcast_msg)
 def process_broadcast_msg(message):
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     count = 0
     for u_id in users_db.keys():
         try:
@@ -636,7 +664,10 @@ def process_broadcast_msg(message):
 
 @bot.message_handler(state=AdminStates.waiting_for_add_package)
 def process_add_pkg(message):
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     try:
         uc, pr = map(int, message.text.split())
         UC_PACKAGES[uc] = pr
@@ -646,7 +677,10 @@ def process_add_pkg(message):
 
 @bot.message_handler(state=AdminStates.waiting_for_delete_package)
 def process_del_pkg(message):
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     try:
         uc = int(message.text.strip())
         if uc in UC_PACKAGES:
@@ -659,7 +693,10 @@ def process_del_pkg(message):
 
 @bot.message_handler(state=AdminStates.waiting_for_edit_package)
 def process_edit_pkg(message):
-    bot.delete_state(ADMIN_ID, ADMIN_ID)
+    try:
+        bot.delete_state(ADMIN_ID, ADMIN_ID)
+    except Exception:
+        pass
     try:
         uc, pr = map(int, message.text.split())
         UC_PACKAGES[uc] = pr
@@ -667,5 +704,11 @@ def process_edit_pkg(message):
     except Exception:
         bot.send_message(ADMIN_ID, "❌ Хатогӣ. Масал: `60 12`")
 
-# --- ОҒОЗИ БОТ ---
-bot.infinity_polling()
+# --- ОҒОЗИ БОТ ДАР АЛОҲИДА Thread БАРОИ RENDER ---
+def start_bot():
+    bot.infinity_polling(skip_pending=True)
+
+if __name__ == '__main__':
+    keep_alive()
+    bot_thread = Thread(target=start_bot)
+    bot_thread.start()
