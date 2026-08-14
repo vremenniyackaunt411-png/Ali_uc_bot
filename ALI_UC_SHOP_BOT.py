@@ -1,8 +1,32 @@
+import os
+from flask import Flask
+from threading import Thread
+
 import telebot
 from telebot import types
 from telebot.handler_backends import State, StatesGroup
 from telebot.storage import StateMemoryStorage
 
+# ==================== ВЕБ-СЕРВЕР БАРОИ RENDER ====================
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot runs 24/7!"
+
+def run():
+    # Render худаш PORT-ро ба таври автоматикӣ медиҳад
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# Ишғол кардани порт пеш аз оғози бот
+keep_alive()
+
+# ==================== ТАНЗИМОТИ БОТ ====================
 ADMIN_ID = 6871575684  
 TOKEN = "8660164143:AAGL13-xIC2pln1JKKYiPQagb2dzn6N9hhQ"
 
@@ -46,7 +70,7 @@ class AdminStates(StatesGroup):
     waiting_for_delete_package = State()
     waiting_for_edit_package = State()
 
-# --- МЕНЮИ АСОСӢ ---
+# --- МЕНЮҲО ---
 def get_user_main_markup():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -128,8 +152,7 @@ def start_cmd(message):
         )
         bot.send_message(chat_id, text, reply_markup=get_user_main_markup(), parse_mode="Markdown")
 
-# ==================== ИСЛОҲИ СЕНАРИЯИ КОРБАР ====================
-
+# --- СЕНАРИЯИ КОРБАР ---
 @bot.callback_query_handler(func=lambda call: call.data.startswith("user_") or call.data.startswith("add_cart_") or call.data in ["cart_clear", "cart_checkout", "cart_no_action"])
 def user_callback_handler(call):
     chat_id = call.message.chat.id
@@ -173,7 +196,6 @@ def user_callback_handler(call):
             bot.answer_callback_query(call.id, "⚠️ Лутфан аввал миқдори ЮС-ро интихоб кунед!", show_alert=True)
             return
         
-        # Гузаштан ба ҳолати дохил кардани PUBG ID
         bot.set_state(chat_id, UserStates.waiting_for_pubg_id, chat_id)
         
         markup = types.InlineKeyboardMarkup()
@@ -238,7 +260,6 @@ def process_pubg_id(message):
     chat_id = message.chat.id
     pubg_id = message.text.strip()
     
-    # Сабт кардани PUBG ID дар State
     bot.set_state(chat_id, UserStates.waiting_for_receipt, chat_id)
     with bot.retrieve_data(chat_id, chat_id) as data:
         data['pubg_id'] = pubg_id
@@ -293,13 +314,12 @@ def process_receipt(message):
     })
     
     users_db[chat_id]["orders_count"] += 1
-    cart_db[chat_id] = {"uc": 0, "price": 0} # Холӣ кардани сабад пас аз муваффақият
+    cart_db[chat_id] = {"uc": 0, "price": 0}
 
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("ба менюи асоси", callback_data="user_main_menu"))
     bot.reply_to(message, "закази шумо ба админ равон карда шуд дар мудати кутохтарин юс ба айди пубг ирсол карда мешавад. Мунтазир шавед.", reply_markup=markup)
     
-    # Хабар ба админ
     admin_markup = types.InlineKeyboardMarkup()
     admin_markup.add(
         types.InlineKeyboardButton("ичро шуд", callback_data=f"adm_app_{order_id}"),
@@ -319,7 +339,6 @@ def process_receipt(message):
 def process_receipt_wrong(message):
     bot.reply_to(message, "⚠️ Лутфан танҳо **чекро (расм)** равон кунед!")
 
-# Паём ба Админ
 @bot.message_handler(state=UserStates.waiting_for_admin_msg, content_types=['text', 'photo', 'voice'])
 def process_user_msg_to_admin(message):
     chat_id = message.chat.id
@@ -339,7 +358,6 @@ def process_user_msg_to_admin(message):
         
     bot.reply_to(message, "дар хаминчон нависед админ хатман ба шумо чавоб медихад.")
 
-# Отзыв
 @bot.message_handler(state=UserStates.waiting_for_review)
 def process_user_review(message):
     chat_id = message.chat.id
@@ -367,8 +385,7 @@ def process_user_review(message):
     markup.add(types.InlineKeyboardButton("ба менюи асоси", callback_data="user_main_menu"))
     bot.send_message(chat_id, "Отзыви шумо фиристода шуд!", reply_markup=markup)
 
-# ==================== АДМИН СЕНАРИЯСИ ====================
-
+# --- АДМИН СЕНАРИЯСИ ---
 @bot.message_handler(func=lambda m: m.chat.id == ADMIN_ID and m.text in ["📦 Заказҳо", "🌟 Отзывҳо", "🏆 Корбарони муваффақ", "⚙️ Танзими ЮС"])
 def admin_menu_handler(message):
     text = message.text
@@ -650,4 +667,5 @@ def process_edit_pkg(message):
     except Exception:
         bot.send_message(ADMIN_ID, "❌ Хатогӣ. Масал: `60 12`")
 
+# --- ОҒОЗИ БОТ ---
 bot.infinity_polling()
