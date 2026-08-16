@@ -32,6 +32,33 @@ def keep_alive():
 # НАСТРОЙКА
 # ============================================================
 
+BOT_TOKEN = "8660164143:AAGswW4_KWSIQXmqlq8nHWIP2FLhJSFruhs"
+
+ADMIN_ID = 6871575684
+
+# Канали отзывҳо
+REVIEWS_CHANNEL = "@otziv_ALI_US_SHOPP"
+
+# Username-и админ барои тугмаи алоқа
+ADMIN_USERNAME = "@ALI_UC_SHOP"
+
+DB_NAME = "ali_uc_shop.db"
+
+bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+
+db_lock = threading.Lock()
+
+user_states = {}
+admin_states = {}
+
+# Барои нигоҳ доштани message_id-и менюи харид
+shop_messages = {}
+
+
+# ============================================================
+# НАРХНОМА
+# ============================================================
+
 DEFAULT_PRICES = {
     60: 10,
     325: 48,
