@@ -244,7 +244,7 @@ def send_main_menu(chat_id, user_id):
     if user_id == ADMIN_ID:
         btn_admin = telebot.types.InlineKeyboardButton("📊 Гурӯҳҳои васлшуда", callback_data="admin_groups")
         btn_params = telebot.types.InlineKeyboardButton("⚙️ Параметрҳо", callback_data="admin_params")
-        btn_hudomez = telebot.types.InlineKeyboardButton("⚡ Худомезӣ", callback_data="admin_hudomez_menu")
+        btn_hudomez = telebot.types.InlineKeyboardButton("⚡ Худомузӣ", callback_data="admin_hudomez_menu")
         markup.add(btn_admin, btn_params)
         markup.add(btn_hudomez)
 
