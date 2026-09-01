@@ -45,9 +45,7 @@ user_warnings = {}
 admin_states = {}
 
 DEFAULT_BAD_WORDS = [
-    'кунти', 'бго', 'гандон', 'ксиапа', 'ксиоча', 'кси оча', 'кси апа', 'кси хола', 'модарта мег', 'сука', 'сучка', 'далбаёб', 
-    'фуруши дорм', 'фуруши дорам', 'ки мехара', 'апата г', 'апата мег', 'очата г', 'очата мег', 'отата г', 'отата мег', 'suka', 'su4ka',
-    'мегом', 'ksti', 'o4ata m', 'apata m', 'керм', 'kerm', 'мехарм', 'мехарам', 'gom', 'гойда', 'кун', 'кс'
+'кунти', 'бго', 'гандон', 'ксиапа', 'ксиоча', 'кси оча', 'кси апа', 'кси хола', 'модарта мег', 'сука', 'сучка', 'далбаёб', 'апата г', 'апата мег', 'очата г', 'очата мег', 'отата г', 'отата мег', 'suka', 'su4ka', 'мегом', 'ksti', 'o4ata m', 'apata m', 'керм', 'kerm', 'мехарм', 'мехарам', 'gom', 'гойда', 'кси м', 'goyda', 'ксти'
 ]
 
 # --- ИДОРАИ БАЗАИ ПАЁМҲОИ ЛС ---
@@ -215,7 +213,7 @@ def restrict_user(chat_id, user_id, hours):
         can_send_messages=False, 
         can_send_media_messages=False,
         can_send_polls=False, 
-        can_send_other_messages=False, # Барои маҳкам кардани inline bot ва дигар намудҳо
+        can_send_other_messages=False,
         can_add_web_page_previews=False
     )
     try:
@@ -318,13 +316,11 @@ def callback_inline(call):
         send_main_menu(chat_id, user_id)
         bot.answer_callback_query(call.id)
 
-    # --- ТУГМАИ РӮЙХАТИ КОРБАРОНИ ЛС ---
     elif call.data == "admin_pm_users":
         if not PM_DATA:
             bot.answer_callback_query(call.id, "📩 Ҳеҷ паёме аз корбарон дар ЛС сабт нашудааст.", show_alert=True)
             return
 
-        # Тартиб додан аз рӯи охирин паёми омада
         sorted_users = sorted(PM_DATA.items(), key=lambda x: x[1].get("last_updated", 0), reverse=True)
 
         markup = telebot.types.InlineKeyboardMarkup(row_width=1)
@@ -351,7 +347,6 @@ def callback_inline(call):
         )
         bot.answer_callback_query(call.id)
 
-    # --- ДИДАНИ ПАЁМҲОИ КОРБАРИ ИНТИХОБШУДА ВА ҶАВОБДИҲӢ ---
     elif call.data.startswith("admin_view_pm_"):
         target_id = call.data.replace("admin_view_pm_", "")
         u_info = PM_DATA.get(target_id)
@@ -364,8 +359,7 @@ def callback_inline(call):
         u_username = escape_html(u_info.get("username", "Никнейм надорад"))
         msgs = u_info.get("messages", [])
 
-        # Паёмҳои охиронро омода месозем
-        recent_msgs = msgs[-10:]  # 10 паёми охирин
+        recent_msgs = msgs[-10:]
         formatted_msgs = ""
         for m in recent_msgs:
             sender = "👤 Корбар" if m["sender"] == "user" else "🤖 Админ"
@@ -378,7 +372,7 @@ def callback_inline(call):
             f"-----------------------------------\n"
             f"💬 <b>Таърихи паёмҳо:</b>\n\n"
             f"{formatted_msgs}\n"
-            f"<i>✍️ Барои ҷавоб додан ба ин корбар, танҳо ба ҳамин паём ҷавоб (Reply) нависед ё тугмаи зерро пахш кунед!</i>"
+            f"<i>✍️ Барои ҷавоб додан ба ин корбар, тугмаи зерро пахш кунед!</i>"
         )
 
         admin_states[user_id] = {"action": "reply_to_pm", "target_id": target_id}
@@ -858,10 +852,11 @@ def chat(message):
 
                 if action == "reply_to_pm":
                     target_id = admin_states[user_id]["target_id"]
-                    msg_text = message.text.strip() if message.text else "Паёми медиа"
+                    msg_text = message.text.strip() if message.text else ""
 
                     try:
-                        bot.send_message(target_id, f"<b>💬 Паём аз тарафи Админ:</b>\n\n{escape_html(msg_text)}", parse_mode="HTML")
+                        # ТАНҲО ХУДИ МАТНИ ПАЁМ БА КОРБАР МЕРАВАД (БЕ ХАБАРҲОИ ИЛОВАГӢ)
+                        bot.send_message(target_id, msg_text)
                         
                         # Сабт дар база
                         if target_id in PM_DATA:
@@ -870,9 +865,9 @@ def chat(message):
                             save_pm_messages(PM_DATA)
 
                         admin_states.pop(user_id)
-                        bot.send_message(chat_id, f"✅ Паёми шумо ба корбари ID: <code>{target_id}</code> расонида шуд!", parse_mode="HTML")
+                        bot.send_message(chat_id, f"✅ Паём ба корбари ID: <code>{target_id}</code> равон шуд!", parse_mode="HTML")
                     except Exception as e:
-                        bot.send_message(chat_id, f"❌ Хатогӣ ҳангоми фиристодани паём ба корбар: {e}")
+                        bot.send_message(chat_id, f"❌ Хатогӣ ҳангоми фиристодани паём: {e}")
                     return
 
                 elif action == "wait_broadcast_pm":
@@ -897,7 +892,6 @@ def chat(message):
                     )
                     return
 
-                # ХУДОМЕЗӢ ВА ТАНЗИМОТИ ДИГАР БАРОИ АДМИН
                 elif action == "wait_qa_question":
                     q_text = message.text.strip().lower()
                     admin_states[user_id] = {"action": "wait_qa_answer", "question": q_text}
@@ -1069,7 +1063,7 @@ def chat(message):
             PM_DATA[str_u_id]["last_updated"] = time.time()
             save_pm_messages(PM_DATA)
 
-            # ОГОҲИИ ФАВРӢ БА АДМИН ҲАНГОМИ ОМАДАНИ ПАЁМИ НАВ
+            # ОГОҲИИ ФАВРӢ БА АДМИН
             markup = telebot.types.InlineKeyboardMarkup()
             markup.add(telebot.types.InlineKeyboardButton("💬 Ҷавоб додан", callback_data=f"admin_view_pm_{str_u_id}"))
 
@@ -1082,12 +1076,12 @@ def chat(message):
             try:
                 bot.send_message(ADMIN_ID, notify_text, parse_mode="HTML", reply_markup=markup)
             except Exception as e:
-                print(f"Хатогӣ ҳангоми фиристодани хабар ба админ: {e}")
+                print(f"Хатогӣ: {e}")
 
-            bot.send_message(chat_id, "✅ Паёми шумо ба админ расонида шуд! Мунтазири ҷавоб бошед.")
+            # БОТ БА КОРБАР ҲЕҶ ПАЁМ НАМЕФИРИСТАД (БА МОНАНДИ ЧАТИ ОДДӢ)
             return
 
-    # --- МАЗМУНИ МУҲОФИЗАТИ ГУРӮҲ ВА ЧАТ (БЕ ТАҒЙИРОТ) ---
+    # --- МАЗМУНИ МУҲОФИЗАТИ ГУРӮҲ ВА ЧАТ ---
     if message.chat.type in ['group', 'supergroup']:
         groups = load_groups()
         if chat_id not in groups:
@@ -1110,7 +1104,6 @@ def chat(message):
                 "mute_until": 0
             }
 
-        # Агар корбар блок (мут) бошад ва тавассути via_bot ё паёми дигар паём фиристад, онро фавран нест мекунем
         if user_warnings[user_id].get("mute_until", 0) > time.time():
             try:
                 bot.delete_message(message.chat.id, message.message_id)
@@ -1213,7 +1206,7 @@ def chat(message):
                     print(f"❌ Хатогӣ: {e}")
             return
 
-    # АВТО-ОМӮЗИШ ВА ҶАВОБДИҲӢ БО НАЗРАДОШТИ ТАНЗИМИ ИДОРАИ ҲОЗИРУҶАВОБӢ
+    # АВТО-ОМӮЗИШ ВА ҶАВОБДИҲӢ (ХУДОМЕЗӢ)
     if message.chat.type in ['group', 'supergroup'] and message.content_type == 'text':
         text_clean = message.text.strip().lower()
         now = time.time()
