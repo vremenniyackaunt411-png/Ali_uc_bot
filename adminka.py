@@ -36,8 +36,8 @@ bot = telebot.TeleBot(TOKEN)
 FILE_ANSWERS = "answers.json"
 FILE_GROUPS = "groups.json"
 FILE_BAD_WORDS = "bad_words.json"
+FILE_SETTINGS = "settings.json"
 
-# Вақти нигоҳдории саволу ҷавобҳо: 7 рӯз
 CLEANUP_INTERVAL_SECONDS = 7 * 24 * 3600
 
 user_warnings = {}
@@ -46,12 +46,25 @@ admin_states = {}
 DEFAULT_BAD_WORDS = [
     'кунти', 'бго', 'гандон', 'ксиапа', 'ксиоча', 'кси оча', 'кси апа', 'кси хола', 'модарта мег', 'сука', 'сучка', 'далбаёб', 
     'фуруши дорм', 'фуруши дорам', 'ки мехара', 'апата г', 'апата мег', 'очата г', 'очата мег', 'отата г', 'отата мег', 'suka', 'su4ka',
-    'мегом', 'ksti', 'o4ata m', 'apata m', 'керм', 'kerm', 'мехарм', 'мехарам', 'gom', 'гойда' 
+    'мегом', 'ksti', 'o4ata m', 'apata m', 'керм', 'kerm', 'мехарм', 'мехарам', 'gom', 'гойда', 'кун', 'кс'
 ]
 
-# ==========================================
-# ФАЙЛҲОИ ДИНАМИКИИ КАЛИМАҲОИ НОҶО
-# ==========================================
+# Танзимоти пешфарз (Шумораи калимаҳои мувофиқ)
+def load_settings():
+    if os.path.exists(FILE_SETTINGS):
+        with open(FILE_SETTINGS, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except:
+                return {"min_words_match": 2}
+    return {"min_words_match": 2}
+
+def save_settings(settings):
+    with open(FILE_SETTINGS, "w", encoding="utf-8") as f:
+        json.dump(settings, f, ensure_ascii=False, indent=4)
+
+SETTINGS = load_settings()
+
 def load_bad_words():
     if os.path.exists(FILE_BAD_WORDS):
         with open(FILE_BAD_WORDS, "r", encoding="utf-8") as f:
@@ -67,31 +80,30 @@ def save_bad_words(words_list):
 
 BAD_WORDS = load_bad_words()
 
-# ==========================================
-# 3. ТОЗАИ НАВШУДАИ БАЗА (2 ИСТИФОДА Ё 7 РӮЗ)
-# ==========================================
 def cleanup_old_answers(data):
     current_time = time.time()
     cleaned_data = {}
     
     for key, questions in data.items():
         cleaned_questions = {}
-        for q, responses in questions.items():
+        for q, responses in responses_item if isinstance(responses, dict) else (q, responses):
             valid_responses = []
             if isinstance(responses, list):
                 for item in responses:
-                    if isinstance(item, dict) and "text" in item and "time" in item:
+                    if isinstance(item, dict) and "text" in item:
+                        max_uses = item.get("max_uses", 2)
                         use_count = item.get("use_count", 0)
-                        is_expired = (current_time - item["time"]) > CLEANUP_INTERVAL_SECONDS
+                        item_time = item.get("time", current_time)
+                        is_expired = (current_time - item_time) > CLEANUP_INTERVAL_SECONDS
                         
-                        if use_count < 2 and not is_expired:
+                        if use_count < max_uses and not is_expired:
                             valid_responses.append(item)
                     elif isinstance(item, str):
-                        valid_responses.append({"text": item, "time": current_time, "use_count": 0})
+                        valid_responses.append({"text": item, "time": current_time, "use_count": 0, "max_uses": 2})
             
-            cleaned_questions[q] = valid_responses
+            if valid_responses:
+                cleaned_questions[q] = valid_responses
         
-        cleaned_questions = {q: resp for q, resp in cleaned_questions.items() if resp}
         if cleaned_questions:
             cleaned_data[key] = cleaned_questions
             
@@ -221,7 +233,7 @@ def get_group_link(chat_id):
         return None
 
 # ==========================================
-# 4. МЕНЮИ АСОСӢ (БАРОИ ЛС - ЧАТИ БОТ)
+# 4. МЕНЮИ АСОСӢ
 # ==========================================
 def send_main_menu(chat_id, user_id):
     markup = get_add_to_group_keyboard()
@@ -229,7 +241,9 @@ def send_main_menu(chat_id, user_id):
     if user_id == ADMIN_ID:
         btn_admin = telebot.types.InlineKeyboardButton("📊 Гурӯҳҳои васлшуда", callback_data="admin_groups")
         btn_params = telebot.types.InlineKeyboardButton("⚙️ Параметрҳо", callback_data="admin_params")
+        btn_hudomez = telebot.types.InlineKeyboardButton("⚡ Худомезӣ", callback_data="admin_hudomez_menu")
         markup.add(btn_admin, btn_params)
+        markup.add(btn_hudomez)
 
     welcome_text = (
         "<b>Салом! Хуш омадед ба боти муҳофиз! 👋🤖</b>\n\n"
@@ -238,9 +252,6 @@ def send_main_menu(chat_id, user_id):
     )
     bot.send_message(chat_id, welcome_text, parse_mode="HTML", reply_markup=markup)
 
-# =====================
-# START / MENU
-# =====================
 @bot.message_handler(commands=['start'])
 def start(message):
     if message.chat.type != 'private':
@@ -269,7 +280,7 @@ def start(message):
 # ==========================================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    global BAD_WORDS
+    global BAD_WORDS, SETTINGS
     user_id = call.from_user.id
     chat_id = call.message.chat.id
 
@@ -280,7 +291,10 @@ def callback_inline(call):
     if call.data == "main_menu":
         if user_id in admin_states:
             admin_states.pop(user_id)
-        bot.delete_message(chat_id, call.message.message_id)
+        try:
+            bot.delete_message(chat_id, call.message.message_id)
+        except:
+            pass
         send_main_menu(chat_id, user_id)
         bot.answer_callback_query(call.id)
 
@@ -325,51 +339,174 @@ def callback_inline(call):
         )
         bot.answer_callback_query(call.id)
 
-    # --- РӮЙХАТИ КОРБАРОНИ БЛОКШУДА (НАВСОЗИШУДА) ---
-    elif call.data == "admin_blocked_users":
-        blocked_text = "🚫 <b>Рӯйхати корбарони блокшуда (Mute):</b>\n\n"
-        has_blocked = False
-
-        for u_id, data in user_warnings.items():
-            if data.get("mute_until", 0) > time.time():
-                has_blocked = True
-                u_name = escape_html(data.get("name", "Корбар"))
-                u_username = data.get("username", "Никнейм надорад")
-                g_title = escape_html(data.get("group_title", "Гурӯҳ"))
-                g_link = data.get("group_link")
-
-                start_str = datetime.fromtimestamp(data.get("mute_start", time.time())).strftime("%d.%m.%Y %H:%M")
-                until_str = datetime.fromtimestamp(data.get("mute_until", time.time())).strftime("%d.%m.%Y %H:%M")
-
-                if g_link:
-                    group_str = f"<a href='{g_link}'>{g_title}</a>"
-                else:
-                    group_str = g_title
-
-                user_str = f"<a href='tg://user?id={u_id}'>{u_name}</a> ({escape_html(u_username)})"
-
-                blocked_text += (
-                    f"👤 <b>Корбар:</b> {user_str}\n"
-                    f"👥 <b>Аз гурӯҳи:</b> {group_str}\n"
-                    f"⏰ <b>Блок шуд:</b> {start_str} то {until_str}\n"
-                    f"──────────────────\n"
-                )
-
-        if not has_blocked:
-            blocked_text += "<i>Дар ҳоли ҳозир корбари блокшуда (Mute) нест.</i>"
-
-        markup = telebot.types.InlineKeyboardMarkup()
-        markup.add(telebot.types.InlineKeyboardButton("🔙 Ба параметрҳо", callback_data="admin_params"))
+    # --- МЕНЮИ ХУДОМЕЗӢ ---
+    elif call.data == "admin_hudomez_menu":
+        markup = telebot.types.InlineKeyboardMarkup(row_width=1)
+        btn_add_qa = telebot.types.InlineKeyboardButton("1. Илова кардани ҳозиру ҷавоб ➕", callback_data="admin_add_qa")
+        btn_control_qa = telebot.types.InlineKeyboardButton("2. Идораи ҳозиру ҷавоб ⚙️", callback_data="admin_control_qa")
+        btn_back = telebot.types.InlineKeyboardButton("🔙 Ба менюи асосӣ", callback_data="main_menu")
+        markup.add(btn_add_qa, btn_control_qa, btn_back)
 
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text=blocked_text,
+            text="⚡ <b>Бахши «Худомезӣ»:</b>\n\nБахши заруриро интихоб кунед:",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    # 1. ИЛОВА КАРДАНИ ҲОЗИРУ ҶАВОБ (ҚАДАМИ 1: САВОЛ)
+    elif call.data == "admin_add_qa":
+        admin_states[user_id] = {"action": "wait_qa_question"}
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("❌ Бекор кардан", callback_data="admin_hudomez_menu"))
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text="❓ <b>Саволро нависед:</b>\n\n<i>Саволеро, ки корбарон дар гурӯҳ менависанд, равон кунед:</i>",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    # 2. ИДОРАИ ҲОЗИРУ ҶАВОБ (САНҶИШИ МУВОФИҚАТИ КАЛИМАҲО)
+    elif call.data == "admin_control_qa":
+        admin_states[user_id] = {"action": "wait_match_limit"}
+        markup = telebot.types.InlineKeyboardMarkup()
+        markup.add(telebot.types.InlineKeyboardButton("❌ Бекор кардан", callback_data="admin_hudomez_menu"))
+
+        curr_limit = SETTINGS.get("min_words_match", 2)
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=(
+                f"⚙️ <b>Идораи ҳозиру ҷавоб:</b>\n\n"
+                f"Ҳозир бот ба паёмҳое ҷавоб медиҳад, ки камаш <b>{curr_limit}</b> калимаи мувофиқ доранд.\n\n"
+                f"Рақами нав нависед (масалан: <code>1</code>, <code>2</code>, <code>3</code> ва ғ.):"
+            ),
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    # --- РӮЙХАТИ КОРБАРОНИ БЛОКШУДА (ТУГМАҲО БО РАҚАМҲО) ---
+    elif call.data == "admin_blocked_users":
+        markup = telebot.types.InlineKeyboardMarkup(row_width=1)
+        has_blocked = False
+        counter = 1
+
+        for u_id, data in list(user_warnings.items()):
+            if data.get("mute_until", 0) > time.time():
+                has_blocked = True
+                u_name = data.get("name", "Корбар")
+                
+                btn_text = f"{counter}. {u_name}"
+                btn = telebot.types.InlineKeyboardButton(btn_text, callback_data=f"admin_view_blocked_{u_id}")
+                markup.add(btn)
+                counter += 1
+
+        btn_back = telebot.types.InlineKeyboardButton("🔙 Ба параметрҳо", callback_data="admin_params")
+        markup.add(btn_back)
+
+        if has_blocked:
+            msg_text = "🚫 <b>Рӯйхати корбарони блокшуда (Mute):</b>\n\n<i>Барои дидани маълумоти пурра ва аз блок гирифтан, корбарро интихоб кунед:</i>"
+        else:
+            msg_text = "🚫 <b>Рӯйхати корбарони блокшуда (Mute):</b>\n\n<i>Дар ҳоли ҳозир ҳеҷ корбари блокшуда нест.</i>"
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=msg_text,
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    # --- ДИДАНИ МАЪЛУМОТИ КОРБАРИ БЛОКШУДА ---
+    elif call.data.startswith("admin_view_blocked_"):
+        target_id = int(call.data.replace("admin_view_blocked_", ""))
+        data = user_warnings.get(target_id, {})
+
+        if not data or data.get("mute_until", 0) <= time.time():
+            bot.answer_callback_query(call.id, "❌ Ин корбар аллакай аз блок баромадааст ё ёфт нашуд.", show_alert=True)
+            return
+
+        u_name = escape_html(data.get("name", "Корбар"))
+        u_username = escape_html(data.get("username", "Никнейм надорад"))
+        g_title = escape_html(data.get("group_title", "Гурӯҳ"))
+        g_link = data.get("group_link")
+
+        start_str = datetime.fromtimestamp(data.get("mute_start", time.time())).strftime("%d.%m.%Y %H:%M")
+        until_str = datetime.fromtimestamp(data.get("mute_until", time.time())).strftime("%d.%m.%Y %H:%M")
+
+        if g_link:
+            group_str = f"<a href='{g_link}'>{g_title}</a>"
+        else:
+            group_str = g_title
+
+        user_str = f"<a href='tg://user?id={target_id}'>{u_name}</a> ({u_username})"
+
+        info_text = (
+            f"👤 <b>Ном:</b> {user_str}\n"
+            f"🏷 <b>Никнейм:</b> {u_username}\n"
+            f"🆔 <b>ID:</b> <code>{target_id}</code>\n"
+            f"👥 <b>Гурӯҳ:</b> {group_str}\n"
+            f"⏰ <b>Вақти блок:</b> аз {start_str} то {until_str}"
+        )
+
+        markup = telebot.types.InlineKeyboardMarkup(row_width=1)
+        btn_unmute = telebot.types.InlineKeyboardButton("🔓 Аз блок гирифтан", callback_data=f"admin_unmute_{target_id}")
+        btn_back = telebot.types.InlineKeyboardButton("🔙 Ба ақиб", callback_data="admin_blocked_users")
+        markup.add(btn_unmute, btn_back)
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=info_text,
             parse_mode="HTML",
             disable_web_page_preview=True,
             reply_markup=markup
         )
         bot.answer_callback_query(call.id)
+
+    # --- АМАЛИЁТИ АЗ БЛОК ГИРИФТАН (UNMUTE) ---
+    elif call.data.startswith("admin_unmute_"):
+        target_id = int(call.data.replace("admin_unmute_", ""))
+        data = user_warnings.get(target_id, {})
+        
+        group_id = None
+        for g_id, g_name in load_groups().items():
+            if g_name == data.get("group_title"):
+                group_id = int(g_id)
+                break
+
+        if group_id:
+            try:
+                bot.restrict_chat_member(
+                    group_id, 
+                    target_id, 
+                    permissions=telebot.types.ChatPermissions(
+                        can_send_messages=True, can_send_media_messages=True,
+                        can_send_audios=True, can_send_documents=True,
+                        can_send_photos=True, can_send_videos=True,
+                        can_send_video_notes=True, can_send_voice_notes=True,
+                        can_send_polls=True, can_send_other_messages=True,
+                        can_add_web_page_previews=True
+                    )
+                )
+            except Exception as e:
+                print(f"Хатогӣ ҳангоми озод кардани корбар: {e}")
+
+        if target_id in user_warnings:
+            user_warnings[target_id]["mute_until"] = 0
+            user_warnings[target_id]["mute_start"] = 0
+
+        bot.answer_callback_query(call.id, "✅ Корбар бомуваффақият аз блок гирифта шуд!", show_alert=True)
+        
+        call.data = "admin_blocked_users"
+        callback_inline(call)
 
     elif call.data == "admin_bad_words_menu":
         markup = telebot.types.InlineKeyboardMarkup(row_width=2)
@@ -403,7 +540,7 @@ def callback_inline(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text="➕ <b>Калимаи нав нависед:</b>\n\n<i>Калимаеро, ки мехоҳед дар гурӯҳҳо манъ карда шавад ва барои он бан дода шавад, равон кунед:</i>",
+            text="➕ <b>Калимаи нав нависед:</b>\n\n<i>Калимаеро, ки мехоҳед дар гурӯҳҳо манъ карда шавад, равон кунед:</i>",
             parse_mode="HTML",
             reply_markup=markup
         )
@@ -417,7 +554,7 @@ def callback_inline(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text="🗑 <b>Калимаро барои нест кардан нависед:</b>\n\n<i>Он калимае, ки мехоҳед дигар блок дода нашавад, равон кунед:</i>",
+            text="🗑 <b>Калимаро барои нест кардан нависед:</b>",
             parse_mode="HTML",
             reply_markup=markup
         )
@@ -433,14 +570,14 @@ def callback_inline(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text="📢 <b>Лутфан матнеро, ки мехоҳед ба ҲАМАИ гурӯҳҳо фиристед, нависед:</b>\n\n<i>Ин паём ба таври автоматикӣ ба тамоми чатҳои васлшуда равон мешавад.</i>",
+            text="📢 <b>Лутфан матнеро, ки мехоҳед ба ҲАМАИ гурӯҳҳо фиристед, нависед:</b>",
             parse_mode="HTML",
             reply_markup=markup
         )
         bot.answer_callback_query(call.id)
 
     elif call.data == "admin_refresh_groups":
-        bot.answer_callback_query(call.id, "Лутфан мунтазир шавед, гурӯҳҳо санҷида мешаванд... 🔄", show_alert=False)
+        bot.answer_callback_query(call.id, "Лутфан мунтазир шавед... 🔄", show_alert=False)
         groups = load_groups()
         updated_groups = {}
         removed_count = 0
@@ -449,7 +586,7 @@ def callback_inline(call):
         try:
             bot_id = bot.get_me().id
         except Exception as e:
-            bot.answer_callback_query(call.id, f"Хатогӣ дар пайвастшавӣ: {e}", show_alert=True)
+            bot.answer_callback_query(call.id, f"Хатогӣ: {e}", show_alert=True)
             return
 
         for g_id, g_name in list(groups.items()):
@@ -475,8 +612,7 @@ def callback_inline(call):
             text=(
                 f"🔄 <b>Навсозии гурӯҳҳо ба охир расид!</b>\n\n"
                 f"✅ Гурӯҳҳои фаъол: <b>{kept_count}</b>\n"
-                f"❌ Хориҷшуда/Нестшуда: <b>{removed_count}</b>\n\n"
-                f"<i>Маълумоти базаи шумо бо муваффақият тоза ва нав карда шуд!</i>"
+                f"❌ Хориҷшуда/Нестшуда: <b>{removed_count}</b>"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -500,8 +636,7 @@ def callback_inline(call):
                 f"<b>Гурӯҳи Интихобшуда:</b>\n\n"
                 f"👥 <b>Ном:</b> {escape_html(group_name)}\n"
                 f"🔗 <b>Ссылка:</b> {group_link}\n"
-                f"🆔 <b>ID:</b> <code>{group_id}</code>\n\n"
-                f"Барои аз номи бот ба ин гурӯҳ равон кардани паём тугмаи зеринро зер кунед:"
+                f"🆔 <b>ID:</b> <code>{group_id}</code>\n"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -522,14 +657,14 @@ def callback_inline(call):
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
-            text=f"✍️ <b>Лутфан матнеро, ки мехоҳед ба гурӯҳи «{escape_html(group_name)}» фиристед, нависед:</b>\n\n<i>Паёми навбатии шумо мустақим ба ин гурӯҳ равон мешавад.</i>",
+            text=f"✍️ <b>Лутфан матнеро, ки мехоҳед ба гурӯҳи «{escape_html(group_name)}» фиристед, нависед:</b>",
             parse_mode="HTML",
             reply_markup=markup
         )
         bot.answer_callback_query(call.id)
 
 # ==========================================
-# 6. НЕСТ КАРДАНИ ПАЁМИ СИСТЕМАВӢ ВА ТАБРИКИ НАВ
+# 6. НЕСТ КАРДАНИ ПАЁМИ СИСТЕМАВӢ ВА ТАБРИК
 # ==========================================
 @bot.message_handler(content_types=['new_chat_members'])
 def welcome_new_member(message):
@@ -546,7 +681,7 @@ def welcome_new_member(message):
     try:
         bot.delete_message(chat_id, message.message_id)
     except Exception as e:
-        print(f"Хатогӣ ҳангоми нест кардани паёми омадан: {e}")
+        print(f"Хатогӣ: {e}")
 
     for new_user in message.new_chat_members:
         if new_user.id == bot.get_me().id:
@@ -562,15 +697,12 @@ def welcome_new_member(message):
         welcome_text = f"Хуш омадед ба чати мо, {user_name}! 🫶"
         bot.send_message(chat_id, welcome_text)
 
-# ==========================================
-# НЕСТ КАРДАНИ НАВИШТАҶОТИ ОДАМИ БАРОМАДА
-# ==========================================
 @bot.message_handler(content_types=['left_chat_member'])
 def delete_left_member_message(message):
     try:
         bot.delete_message(message.chat.id, message.message_id)
     except Exception as e:
-        print(f"Хатогӣ ҳангоми нест кардани паёми баромад: {e}")
+        print(f"Хатогӣ: {e}")
 
 def get_message_text(message):
     if message.text:
@@ -580,11 +712,11 @@ def get_message_text(message):
     return ""
 
 # ==========================================
-# 7. ГУФТУГӮ, АВТО-ОМӮЗИШ ВА МОДЕРАТСИЯ
+# 7. ГУФТУГӮ ВА МОДЕРАТСИЯ
 # ==========================================
 @bot.message_handler(func=lambda message: True, content_types=['text', 'photo', 'video', 'document', 'audio', 'voice'])
 def chat(message):
-    global ANSWERS, BAD_WORDS, BOT_USERNAME
+    global ANSWERS, BAD_WORDS, BOT_USERNAME, SETTINGS
     if not BOT_USERNAME:
         BOT_USERNAME = bot.get_me().username
 
@@ -600,17 +732,93 @@ def chat(message):
         user_name = "Канал / Чат"
         user_username = "Аноним"
 
-    # 1. ПАЁМИ АДМИН АЗ ЛС (ИДОРАКУНӢ ВА КАЛИМАҲОИ НОҶО)
     if message.chat.type == 'private' and user_id == ADMIN_ID:
         if user_id in admin_states:
             action = admin_states[user_id].get("action")
+
+            # --- ИДОРАИ ҲОЗИРУ ҶАВОБ (КАДАМҲОИ СУОЛ ВА ҶАВОБ) ---
+            if action == "wait_qa_question":
+                q_text = message.text.strip().lower()
+                admin_states[user_id] = {"action": "wait_qa_answer", "question": q_text}
+                bot.send_message(chat_id, f"✅ Савол қабул шуд: «<b>{escape_html(q_text)}</b>»\n\n💬 Акнун **ҶАВОБ**-ро равон кунед:", parse_mode="HTML")
+                return
+
+            elif action == "wait_qa_answer":
+                a_text = message.text.strip()
+                q_text = admin_states[user_id]["question"]
+                admin_states[user_id] = {"action": "wait_qa_limit", "question": q_text, "answer": a_text}
+                bot.send_message(chat_id, f"✅ Ҷавоб қабул шуд: «<b>{escape_html(a_text)}</b>»\n\n🔢 Акнун рақамеро нависед, ки ин саволу ҷавоб **ЧАНД БОР** дар гурӯҳ такрор шавад (масалан: <code>3</code>):", parse_mode="HTML")
+                return
+
+            elif action == "wait_qa_limit":
+                try:
+                    limit_count = int(message.text.strip())
+                    q_text = admin_states[user_id]["question"]
+                    a_text = admin_states[user_id]["answer"]
+
+                    global_key = "GLOBAL"
+                    if global_key not in ANSWERS:
+                        ANSWERS[global_key] = {}
+
+                    if q_text not in ANSWERS[global_key]:
+                        ANSWERS[global_key][q_text] = []
+
+                    ANSWERS[global_key][q_text].append({
+                        "text": a_text,
+                        "time": time.time(),
+                        "use_count": 0,
+                        "max_uses": limit_count
+                    })
+                    save_answers()
+
+                    admin_states.pop(user_id)
+                    markup = telebot.types.InlineKeyboardMarkup()
+                    markup.add(telebot.types.InlineKeyboardButton("⚡ Ба менюи Худомезӣ", callback_data="admin_hudomez_menu"))
+
+                    bot.send_message(
+                        chat_id,
+                        (
+                            f"🎉 <b>Ҳозиру ҷавоб муваффақона илова шуд!</b>\n\n"
+                            f"❓ Савол: <code>{escape_html(q_text)}</code>\n"
+                            f"💬 Ҷавоб: <code>{escape_html(a_text)}</code>\n"
+                            f"🔢 Лимити такрор: <b>{limit_count} маротиба</b>\n\n"
+                            f"<i>Пас аз {limit_count} бор истифода шудан, ин саволу ҷавоб автоматикӣ нест мешавад.</i>"
+                        ),
+                        parse_mode="HTML",
+                        reply_markup=markup
+                    )
+                except ValueError:
+                    bot.send_message(chat_id, "⚠️ Лутфан танҳо РАҚАМ нависед (масалан: 3):")
+                return
+
+            elif action == "wait_match_limit":
+                try:
+                    match_val = int(message.text.strip())
+                    if match_val < 1:
+                        match_val = 1
+                    SETTINGS["min_words_match"] = match_val
+                    save_settings(SETTINGS)
+
+                    admin_states.pop(user_id)
+                    markup = telebot.types.InlineKeyboardMarkup()
+                    markup.add(telebot.types.InlineKeyboardButton("⚡ Ба менюи Худомезӣ", callback_data="admin_hudomez_menu"))
+
+                    bot.send_message(
+                        chat_id,
+                        f"✅ Танзимот қабул шуд!\n\nАкнун бот танҳо ҳангоми пайдо шудани камаш <b>{match_val}</b> калимаи мувофиқ дар паём ҷавоб медиҳад.",
+                        parse_mode="HTML",
+                        reply_markup=markup
+                    )
+                except ValueError:
+                    bot.send_message(chat_id, "⚠️ Лутфан танҳо РАҚАМ нависед (масалан: 1, 2 ё 3):")
+                return
             
-            if action == "wait_add_bad_word":
+            elif action == "wait_add_bad_word":
                 new_word = message.text.strip().lower()
                 if new_word and new_word not in BAD_WORDS:
                     BAD_WORDS.append(new_word)
                     save_bad_words(BAD_WORDS)
-                    bot.send_message(chat_id, f"✅ Калимаи «<b>{escape_html(new_word)}</b>» ба рӯйхати калимаҳои манъшуда илова шуд ва аз ин пас барои он бан дода мешавад!", parse_mode="HTML")
+                    bot.send_message(chat_id, f"✅ Калимаи «<b>{escape_html(new_word)}</b>» ба рӯйхати калимаҳои манъшуда илова шуд!", parse_mode="HTML")
                 else:
                     bot.send_message(chat_id, "⚠️ Ин калима аллакай дар рӯйхат мавҷуд аст ё нодуруст навишта шуд.")
                 admin_states.pop(user_id)
@@ -621,9 +829,9 @@ def chat(message):
                 if word_to_del in BAD_WORDS:
                     BAD_WORDS.remove(word_to_del)
                     save_bad_words(BAD_WORDS)
-                    bot.send_message(chat_id, f"✅ Калимаи «<b>{escape_html(word_to_del)}</b>» аз рӯйхат нест карда шуд ва акнун барои он блок дода намешавад!", parse_mode="HTML")
+                    bot.send_message(chat_id, f"✅ Калимаи «<b>{escape_html(word_to_del)}</b>» аз рӯйхат нест карда шуд!", parse_mode="HTML")
                 else:
-                    bot.send_message(chat_id, "⚠️ Ин калима дар рӯйхати калимаҳои ноҷо ёфт шумод.")
+                    bot.send_message(chat_id, "⚠️ Ин калима дар рӯйхати калимаҳои ноҷо ёфт нашуд.")
                 admin_states.pop(user_id)
                 return
 
@@ -654,7 +862,7 @@ def chat(message):
                 admin_states.pop(user_id)
                 
                 if not groups:
-                    bot.send_message(chat_id, "❌ Ҳеҷ гурӯҳе дар база ёфт نشуд!")
+                    bot.send_message(chat_id, "❌ Ҳеҷ гурӯҳе дар база ёфт нашуд!")
                     return
 
                 success_count = 0
@@ -668,7 +876,7 @@ def chat(message):
                         success_count += 1
                         time.sleep(0.1)
                     except Exception as e:
-                        print(f"Хатогӣ ҳангоми рассылка ба гурӯҳи {g_id}: {e}")
+                        print(f"Хатогӣ: {e}")
                         fail_count += 1
 
                 markup = telebot.types.InlineKeyboardMarkup()
@@ -677,12 +885,11 @@ def chat(message):
                 report_text = (
                     f"📢 <b>Рассылка ба охир расид!</b>\n\n"
                     f"✅ Ба <b>{success_count}</b> гурӯҳ муваффақона расонида шуд.\n"
-                    f"❌ Ба <b>{fail_count}</b> гурӯҳ фиристода нашуд (шояд бот баромад ё бан шуд)."
+                    f"❌ Ба <b>{fail_count}</b> гурӯҳ фиристода нашуд."
                 )
                 bot.send_message(chat_id, report_text, parse_mode="HTML", reply_markup=markup)
                 return
 
-    # САБТИ ГУРӮҲ
     if message.chat.type in ['group', 'supergroup']:
         groups = load_groups()
         if chat_id not in groups:
@@ -692,7 +899,6 @@ def chat(message):
     msg_text = get_message_text(message)
     is_admin = is_user_admin(message.chat.id, user_id, sender_chat)
 
-    # 2. АНТИСПАМ ВА АНТИДАШНОМ
     if not is_admin and user_id:
         if user_id not in user_warnings:
             user_warnings[user_id] = {
@@ -712,7 +918,7 @@ def chat(message):
             if not user_warnings[user_id].get("group_link"):
                 user_warnings[user_id]["group_link"] = get_group_link(message.chat.id)
 
-        # --- КАЛИМАҲОИ НОҶО ---
+        # КАЛИМАҲОИ НОҶО
         if has_bad_words(msg_text):
             if message.chat.type in ['group', 'supergroup']:
                 try:
@@ -755,10 +961,10 @@ def chat(message):
                         send_to_owner(f"🚫 Корбар {escape_html(user_name)} (<code>{user_id}</code>) барои сухани ноҷо дар гурӯҳи {escape_html(chat_title)} <b>8 соат бан (Mute)</b> шуд!")
                         user_warnings[user_id]["bad_words"] = 0
                 except Exception as e:
-                    print(f"❌ Хатогӣ ҳангоми ҷаримаи калимаи ноҷо: {e}")
+                    print(f"❌ Хатогӣ: {e}")
             return
 
-        # --- ССЫЛКА, НИКНЕЙМ ВА ПЕРЕСЛАТЬ (СПАМ/РЕКЛАМА) ---
+        # РЕКЛАМА / СПАМ
         is_forwarded = message.forward_from or message.forward_from_chat or message.forward_sender_name
         if has_link(msg_text) or has_username(msg_text) or is_forwarded:
             if message.chat.type in ['group', 'supergroup']:
@@ -804,19 +1010,16 @@ def chat(message):
                         send_to_owner(f"🚫 Корбар {escape_html(user_name)} (<code>{user_id}</code>) барои спам/реклама дар гурӯҳи {escape_html(chat_title)} <b>24 соат бан (Mute)</b> шуд!")
                         user_warnings[user_id]["spam"] = 0
                 except Exception as e:
-                    print(f"❌ Хатогӣ ҳангоми ҷаримаи спам: {e}")
+                    print(f"❌ Хатогӣ: {e}")
             return
 
-    # ==========================================
-    # СИСТЕМАИ АВТО-ОМӮЗИШ ВА ҲАМСӮҲБАТӢ
-    # ==========================================
+    # АВТО-ОМӮЗИШ ВА ҶАВОБДИҲӢ БО НАЗРАДОШТИ ТАНЗИМИ ИДОРАИ ҲОЗИРУҶАВОБӢ
     if message.chat.type in ['group', 'supergroup'] and message.content_type == 'text':
         text_clean = message.text.strip().lower()
         now = time.time()
 
         ANSWERS = cleanup_old_answers(ANSWERS)
 
-        # А) Агар паём ҷавоб (Reply) бошад -> САБТ КАРДАН
         if message.reply_to_message and message.reply_to_message.text:
             savol = message.reply_to_message.text.strip().lower()
             javob = message.text.strip()
@@ -831,28 +1034,25 @@ def chat(message):
 
                 existing_texts = [item["text"] for item in ANSWERS[global_key][savol] if isinstance(item, dict)]
                 if javob not in existing_texts:
-                    ANSWERS[global_key][savol].append({"text": javob, "time": now, "use_count": 0})
+                    ANSWERS[global_key][savol].append({"text": javob, "time": now, "use_count": 0, "max_uses": 2})
                     save_answers()
-                    print(f"[Базаи Умумӣ] Сабт шуд: '{savol}' -> '{javob}'")
 
-        # Б) ҶАВОБДИҲИИ АВТОМАТӢ (2 КАЛИМА ВА БЕШ АЗ 2 КАЛИМА)
         if "GLOBAL" in ANSWERS and ANSWERS["GLOBAL"]:
             matched_question = None
+            user_words = [w for w in re.findall(r'\b\w+\b', text_clean) if len(w) > 0]
+            
+            # Танзими шумораи калимаҳои мувофиқ
+            min_match = SETTINGS.get("min_words_match", 2)
 
-            user_words = [w for w in re.findall(r'\b\w+\b', text_clean) if len(w) > 1]
-
-            # Агар корбар 2 ё бештар калима нависад
-            if len(user_words) >= 2:
-                # 1. Мувофиқати дақиқ
+            if len(user_words) >= min_match:
                 if text_clean in ANSWERS["GLOBAL"]:
                     matched_question = text_clean
                 else:
-                    # 2. Санҷиши мувофиқати 2 ё беш аз 2 калима бо саволҳои база
                     for q in ANSWERS["GLOBAL"].keys():
                         q_words = set(re.findall(r'\b\w+\b', q))
                         matching_count = sum(1 for w in user_words if w in q_words)
                         
-                        if matching_count >= 2:
+                        if matching_count >= min_match:
                             matched_question = q
                             break
 
@@ -865,8 +1065,10 @@ def chat(message):
                 bot.reply_to(message, chosen_reply)
 
                 chosen_item["use_count"] = chosen_item.get("use_count", 0) + 1
+                max_allowed = chosen_item.get("max_uses", 2)
 
-                if chosen_item["use_count"] >= 2:
+                # Агар лимити такрори саволу ҷавоб пур шуд, он нест карда мешавад
+                if chosen_item["use_count"] >= max_allowed:
                     responses.remove(chosen_item)
                     if not responses:
                         del ANSWERS["GLOBAL"][matched_question]
