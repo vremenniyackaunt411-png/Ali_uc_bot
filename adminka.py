@@ -282,6 +282,17 @@ def start(message):
     user_username = f"@{message.from_user.username}" if message.from_user.username else "Никнейм надорад"
     user_id = message.from_user.id
 
+    PM_DATA[str(user_id)] = {
+        "user_id": user_id,
+        "first_name": message.from_user.first_name or "",
+        "username": message.from_user.username or "",
+        "last_name": message.from_user.last_name or "",
+        "last_message": "/start",
+        "last_message_time": time.time()
+    }
+
+    save_pm_messages(PM_DATA)
+
     if user_id != ADMIN_ID:
         notify_owner_msg = (
             f"🚀 <b>Старти Нав!</b>\n\n"
