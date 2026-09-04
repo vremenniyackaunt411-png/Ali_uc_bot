@@ -356,7 +356,7 @@ def callback_inline(call):
         counter = 1
         for target_id, u_info in sorted_users:
             msg_count = len(u_info.get("messages", []))
-            u_name = u_info.get("name", "Корбар")
+            u_name = u_info.get("name", "Номи корбар")
             
             btn_text = f"{counter}. {u_name} ({msg_count} паём)"
             btn = telebot.types.InlineKeyboardButton(btn_text, callback_data=f"admin_view_pm_{target_id}")
