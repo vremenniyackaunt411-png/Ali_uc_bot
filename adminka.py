@@ -283,7 +283,7 @@ def start(message):
     user_id = message.from_user.id
 
         # Сабти корбар дар базаи ЛС
-    str_u_id = str(user_id)
+        str_u_id = str(user_id)
 
     if str_u_id not in PM_DATA:
         PM_DATA[str_u_id] = {
