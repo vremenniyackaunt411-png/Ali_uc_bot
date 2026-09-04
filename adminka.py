@@ -282,16 +282,34 @@ def start(message):
     user_username = f"@{message.from_user.username}" if message.from_user.username else "Никнейм надорад"
     user_id = message.from_user.id
 
-    PM_DATA[str(user_id)] = {
-        "user_id": user_id,
-        "first_name": message.from_user.first_name or "",
-        "username": message.from_user.username or "",
-        "last_name": message.from_user.last_name or "",
-        "last_message": "/start",
-        "last_message_time": time.time()
-    }
+    # Сабти корбар дар базаи ЛС
+str_u_id = str(user_id)
 
-    save_pm_messages(PM_DATA)
+if str_u_id not in PM_DATA:
+    PM_DATA[str_u_id] = {
+        "user_id": user_id,
+        "name": user_name,
+        "username": user_username,
+        "first_name": message.from_user.first_name or "",
+        "last_name": message.from_user.last_name or "",
+        "messages": [],
+        "last_updated": time.time()
+    }
+else:
+    # Агар корбар аллакай сабт шуда бошад,
+    # танҳо маълумоти ӯро нав мекунем ва паёмҳояшро нигоҳ медорем.
+    PM_DATA[str_u_id]["user_id"] = user_id
+    PM_DATA[str_u_id]["name"] = user_name
+    PM_DATA[str_u_id]["username"] = user_username
+    PM_DATA[str_u_id]["first_name"] = message.from_user.first_name or ""
+    PM_DATA[str_u_id]["last_name"] = message.from_user.last_name or ""
+    PM_DATA[str_u_id]["last_updated"] = time.time()
+
+# Агар бо ягон сабаб messages вуҷуд надошта бошад
+if "messages" not in PM_DATA[str_u_id]:
+    PM_DATA[str_u_id]["messages"] = []
+
+save_pm_messages(PM_DATA)
 
     if user_id != ADMIN_ID:
         notify_owner_msg = (
