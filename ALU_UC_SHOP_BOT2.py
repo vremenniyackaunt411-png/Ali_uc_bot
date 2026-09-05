@@ -13,7 +13,7 @@ from flask import Flask
 # НАСТРОЙКА
 # ============================================================
 
-BOT_TOKEN = "8660164143:AAEt1TXap-zqppH819CdWX2P3vwCFT99Hfs"
+BOT_TOKEN = "8660164143:AAGswW4_KWSIQXmqlq8nHWIP2FLhJSFruhs"
 
 ADMIN_ID = 6871575684
 
@@ -600,6 +600,7 @@ def admin_back_home():
     commands=["start"]
 )
 def start(message):
+    add_user(message.from_user)
 
     add_user(
         message.from_user
@@ -649,6 +650,7 @@ def start(message):
     m.text == "🎁 Бонусҳои ман"
 )
 def my_bonus(message):
+    add_user(message.from_user)
 
     user_id = message.from_user.id
 
@@ -805,6 +807,7 @@ def shop_keyboard():
     call.data == "use_bonus"
 )
 def use_bonus(call):
+    add_user(call.from_user)
 
     user_id = call.from_user.id
 
@@ -888,6 +891,7 @@ def use_bonus(call):
     call.data.startswith("use_bonus_uc:")
 )
 def use_bonus_uc(call):
+    add_user(call.from_user)
 
     user_id = call.from_user.id
 
@@ -1184,6 +1188,7 @@ def show_shop(
     m.text == "🛒 Харидани UC"
 )
 def buy_uc(message):
+    add_user(message.from_user)
 
     user_id = message.from_user.id
 
@@ -1206,6 +1211,7 @@ def buy_uc(message):
     func=lambda call: call.data.startswith("adduc:")
 )
 def add_uc(call):
+    add_user(call.from_user)
 
     user_id = call.from_user.id
 
@@ -1343,6 +1349,7 @@ def add_uc(call):
     func=lambda call: call.data == "clear_cart"
 )
 def clear_cart(call):
+    add_user(call.from_user)
 
     user_id = call.from_user.id
 
@@ -1387,6 +1394,7 @@ def clear_cart(call):
     call.data == "buy"
 )
 def start_purchase(call):
+    add_user(call.from_user)
 
     user_id = call.from_user.id
 
@@ -1504,6 +1512,7 @@ def start_purchase(call):
     == "waiting_pubg_id"
 )
 def receive_pubg_id(message):
+    add_user(message.from_user)
 
     user_id = message.from_user.id
 
@@ -1568,6 +1577,7 @@ def receive_pubg_id(message):
     == "waiting_bonus_pubg_id"
 )
 def receive_bonus_pubg_id(message):
+    add_user(message.from_user)
 
     user_id = message.from_user.id
 
@@ -1783,6 +1793,7 @@ def receive_bonus_pubg_id(message):
     == "waiting_receipt"
 )
 def receive_receipt(message):
+    add_user(message.from_user)
 
     user_id = message.from_user.id
 
@@ -2027,6 +2038,7 @@ def send_bonus_order_to_admin(order_id):
     call.data.startswith("order_done:")
 )
 def order_done(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         bot.answer_callback_query(
@@ -2158,6 +2170,7 @@ def order_done(call):
     call.data.startswith("order_reject:")
 )
 def order_reject(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
 
@@ -2225,6 +2238,7 @@ def order_reject(call):
     == "reject_order"
 )
 def reject_reason(message):
+    add_user(message.from_user)
 
     data = admin_states[
         ADMIN_ID
@@ -2358,6 +2372,7 @@ def reject_reason(message):
     m.text == "📦 Заказҳои ман"
 )
 def user_orders(message):
+    add_user(message.from_user)
 
     if message.from_user.id == ADMIN_ID:
 
@@ -2439,6 +2454,7 @@ def user_orders(message):
     m.text.startswith("⭐ Отзывы")
 )
 def user_reviews(message):
+    add_user(message.from_user)
 
     if message.from_user.id == ADMIN_ID:
 
@@ -2493,6 +2509,7 @@ def user_reviews(message):
     call.data.startswith("review:")
 )
 def start_review(call):
+    add_user(call.from_user)
 
     user_id = call.from_user.id
 
@@ -2564,6 +2581,7 @@ def start_review(call):
     == "waiting_review"
 )
 def receive_review(message):
+    add_user(message.from_user)
 
     user_id = message.from_user.id
 
@@ -2924,6 +2942,7 @@ def admin_reviews(message):
     call.data.startswith("admin_review:")
 )
 def admin_review_details(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -3016,6 +3035,7 @@ def admin_review_details(call):
     call.data.startswith("review_accept:")
 )
 def review_accept(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -3227,6 +3247,7 @@ def review_accept(call):
     call.data.startswith("review_reject:")
 )
 def review_reject(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -3288,6 +3309,7 @@ def review_reject(call):
     == "reject_review"
 )
 def reject_review_reason(message):
+    add_user(message.from_user)
 
     review_id = admin_states[
         ADMIN_ID
@@ -3464,6 +3486,7 @@ def show_admin_orders_menu(chat_id):
     m.text.startswith("📦 Заказҳо")
 )
 def admin_orders_button(message):
+    add_user(message.from_user)
 
     if message.from_user.id != ADMIN_ID:
         return
@@ -3581,6 +3604,7 @@ def show_admin_orders(
     call.data == "admin_delete_orders"
 )
 def admin_delete_orders(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -3617,6 +3641,7 @@ def admin_delete_orders(call):
     ]
 )
 def admin_orders_list(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -3647,6 +3672,7 @@ def admin_orders_list(call):
     call.data == "admin_orders"
 )
 def admin_orders_back(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -3669,6 +3695,7 @@ def admin_orders_back(call):
     call.data.startswith("admin_order:")
 )
 def admin_order_details(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -3776,6 +3803,7 @@ def admin_order_details(call):
     and m.from_user.id == ADMIN_ID
 )
 def admin_reviews_button(message):
+    add_user(message.from_user)
 
     admin_reviews(
         message
@@ -3791,6 +3819,7 @@ def admin_reviews_button(message):
     m.text.startswith("👥 Корбарони фаъол")
 )
 def active_users(message):
+    add_user(message.from_user)
 
     if message.from_user.id != ADMIN_ID:
         return
@@ -3895,6 +3924,7 @@ def active_users(message):
     call.data.startswith("active_user:")
 )
 def active_user_details(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4042,6 +4072,7 @@ def active_user_details(call):
     call.data == "active_users_back"
 )
 def active_users_back(call):
+    add_user(call.from_user)
 
     bot.answer_callback_query(
         call.id
@@ -4063,6 +4094,7 @@ def active_users_back(call):
     call.data.startswith("message_user:")
 )
 def message_user(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4107,6 +4139,7 @@ def message_user(call):
     == "message_user"
 )
 def send_message_user(message):
+    add_user(message.from_user)
 
     data = admin_states[
         ADMIN_ID
@@ -4171,6 +4204,7 @@ def send_message_user(message):
     call.data == "message_all_users"
 )
 def broadcast(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4210,6 +4244,7 @@ def broadcast(call):
     == "broadcast"
 )
 def do_broadcast(message):
+    add_user(message.from_user)
 
     with db_lock:
 
@@ -4288,6 +4323,7 @@ def do_broadcast(message):
     m.text == "👨‍💻 Алоқа бо админ"
 )
 def contact_admin(message):
+    add_user(message.from_user)
 
     if message.from_user.id == ADMIN_ID:
 
@@ -4331,6 +4367,7 @@ def contact_admin(message):
     == "contact_admin"
 )
 def contact_message(message):
+    add_user(message.from_user)
 
     user_id = message.from_user.id
 
@@ -4434,6 +4471,7 @@ def contact_message(message):
     call.data.startswith("reply_user:")
 )
 def reply_user(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4478,6 +4516,7 @@ def reply_user(call):
     == "reply_user"
 )
 def send_admin_reply(message):
+    add_user(message.from_user)
 
     user_id = admin_states[
         ADMIN_ID
@@ -4540,6 +4579,7 @@ def send_admin_reply(message):
     m.text == "🎁 Танзими бонус"
 )
 def bonus_settings(message):
+    add_user(message.from_user)
 
     if message.from_user.id != ADMIN_ID:
         return
@@ -4620,6 +4660,7 @@ def show_bonus_settings(chat_id):
     call.data == "bonus_edit"
 )
 def bonus_edit(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4681,6 +4722,7 @@ def bonus_edit(call):
     call.data.startswith("bonus_select:")
 )
 def bonus_select(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4732,6 +4774,7 @@ def bonus_select(call):
         ).get("state") == "edit_bonus"
 )
 def save_new_bonus(message):
+    add_user(message.from_user)
 
     text = (message.text or "").strip()
 
@@ -4815,6 +4858,7 @@ def save_new_bonus(message):
     call.data == "bonus_settings_back"
 )
 def bonus_settings_back(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4837,6 +4881,7 @@ def bonus_settings_back(call):
     call.data == "bonus_ranking"
 )
 def bonus_ranking(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -4920,6 +4965,7 @@ def bonus_ranking(call):
     call.data.startswith("bonus_rank_user:")
 )
 def bonus_rank_user(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -5039,6 +5085,7 @@ def bonus_rank_user(call):
     call.data.startswith("bonus_reduce_user:")
 )
 def bonus_reduce_user(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -5101,6 +5148,7 @@ def bonus_reduce_user(call):
     == "reduce_bonus_amount"
 )
 def reduce_bonus_amount(message):
+    add_user(message.from_user)
 
     try:
         amount = int(
@@ -5189,6 +5237,7 @@ def reduce_bonus_amount(message):
     == "reduce_bonus_reason"
 )
 def reduce_bonus_reason(message):
+    add_user(message.from_user)
 
     reason = (message.text or "").strip()
 
@@ -5319,6 +5368,7 @@ def reduce_bonus_reason(message):
     call.data.startswith("bonus_add_user:")
 )
 def bonus_add_user(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -5382,6 +5432,7 @@ def bonus_add_user(call):
     == "add_bonus_amount"
 )
 def add_bonus_amount(message):
+    add_user(message.from_user)
 
     try:
         amount = int(
@@ -5460,6 +5511,7 @@ def add_bonus_amount(message):
     == "add_bonus_reason"
 )
 def add_bonus_reason(message):
+    add_user(message.from_user)
 
     reason = (
         message.text or ""
@@ -5609,6 +5661,7 @@ def add_bonus_reason(message):
     call.data == "bonus_ranking_back"
 )
 def bonus_ranking_back(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -5628,6 +5681,7 @@ def bonus_ranking_back(call):
     m.text == "💰 Танзими UC"
 )
 def uc_settings(message):
+    add_user(message.from_user)
 
     if message.from_user.id != ADMIN_ID:
         return
@@ -5699,6 +5753,7 @@ def show_uc_settings(chat_id):
     call.data == "add_package"
 )
 def add_package(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -5730,6 +5785,7 @@ def add_package(call):
     == "add_uc"
 )
 def add_uc_admin(message):
+    add_user(message.from_user)
 
     try:
 
@@ -5781,6 +5837,7 @@ def add_uc_admin(message):
     == "add_price"
 )
 def add_price_admin(message):
+    add_user(message.from_user)
 
     try:
 
@@ -5857,6 +5914,7 @@ def add_price_admin(message):
     call.data == "delete_package"
 )
 def delete_package(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -5888,6 +5946,7 @@ def delete_package(call):
     == "delete_uc"
 )
 def delete_uc_admin(message):
+    add_user(message.from_user)
 
     try:
 
@@ -5966,6 +6025,7 @@ def delete_uc_admin(message):
     call.data == "confirm_delete_yes"
 )
 def confirm_delete_yes(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6035,6 +6095,7 @@ def confirm_delete_yes(call):
     call.data == "confirm_delete_no"
 )
 def confirm_delete_no(call):
+    add_user(call.from_user)
 
     admin_states.pop(
         ADMIN_ID,
@@ -6060,6 +6121,7 @@ def confirm_delete_no(call):
     call.data == "edit_package"
 )
 def edit_package(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6091,6 +6153,7 @@ def edit_package(call):
     == "edit_old_uc"
 )
 def edit_old_uc(message):
+    add_user(message.from_user)
 
     try:
 
@@ -6147,6 +6210,7 @@ def edit_old_uc(message):
     == "edit_new_uc"
 )
 def edit_new_uc(message):
+    add_user(message.from_user)
 
     try:
 
@@ -6206,6 +6270,7 @@ def edit_new_uc(message):
     == "edit_new_price"
 )
 def edit_new_price(message):
+    add_user(message.from_user)
 
     try:
 
@@ -6300,6 +6365,7 @@ def edit_new_price(message):
     call.data == "home"
 )
 def user_home_callback(call):
+    add_user(call.from_user)
 
     user_states.pop(
         call.from_user.id,
@@ -6348,6 +6414,7 @@ def user_home_callback(call):
     call.data == "back"
 )
 def user_back_callback(call):
+    add_user(call.from_user)
 
     user_states.pop(
         call.from_user.id,
@@ -6387,6 +6454,7 @@ def user_back_callback(call):
     call.data == "admin_home"
 )
 def admin_home_callback(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6419,6 +6487,7 @@ def admin_home_callback(call):
     call.data == "admin_back"
 )
 def admin_back_callback(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6451,6 +6520,7 @@ def admin_back_callback(call):
     call.data == "admin_uc"
 )
 def admin_uc_callback(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6478,6 +6548,7 @@ def admin_uc_callback(call):
     call.data == "admin_reviews"
 )
 def admin_reviews_callback(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6500,6 +6571,7 @@ def admin_reviews_callback(call):
     m.text == "🏠 Менюи асосӣ"
 )
 def text_home(message):
+    add_user(message.from_user)
 
     if message.from_user.id == ADMIN_ID:
 
@@ -6547,6 +6619,7 @@ def text_home(message):
     ).get("state") == "delete_orders"
 )
 def receive_delete_orders_count(message):
+    add_user(message.from_user)
 
     text = message.text.strip()
 
@@ -6689,6 +6762,7 @@ def receive_delete_orders_count(message):
     call.data == "confirm_delete_orders"
 )
 def confirm_delete_orders(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6784,6 +6858,7 @@ def confirm_delete_orders(call):
     call.data == "cancel_delete_orders"
 )
 def cancel_delete_orders(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6817,6 +6892,7 @@ def cancel_delete_orders(call):
     call.data == "admin_delete_reviews"
 )
 def admin_delete_reviews(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -6852,6 +6928,7 @@ def admin_delete_reviews(call):
     ).get("state") == "delete_reviews"
 )
 def receive_delete_reviews_count(message):
+    add_user(message.from_user)
 
     text = message.text.strip()
 
@@ -6993,6 +7070,7 @@ def receive_delete_reviews_count(message):
     call.data == "confirm_delete_reviews"
 )
 def confirm_delete_reviews(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -7086,6 +7164,7 @@ def confirm_delete_reviews(call):
     call.data == "cancel_delete_reviews"
 )
 def cancel_delete_reviews(call):
+    add_user(call.from_user)
 
     if call.from_user.id != ADMIN_ID:
         return
@@ -7117,6 +7196,7 @@ def cancel_delete_reviews(call):
     func=lambda m: True
 )
 def auto_add_user(message):
+    add_user(message.from_user)
 
     add_user(
         message.from_user
