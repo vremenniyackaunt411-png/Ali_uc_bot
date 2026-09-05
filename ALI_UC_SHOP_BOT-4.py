@@ -13,7 +13,7 @@ from flask import Flask
 # НАСТРОЙКА
 # ============================================================
 
-BOT_TOKEN = "8660164143:AAGswW4_KWSIQXmqlq8nHWIP2FLhJSFruhs"
+BOT_TOKEN = "8660164143:AAEt1TXap-zqppH819CdWX2P3vwCFT99Hfs"
 
 ADMIN_ID = 6871575684
 
