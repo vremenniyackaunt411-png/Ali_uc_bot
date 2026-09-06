@@ -26,12 +26,14 @@ def keep_alive():
     t.daemon = True
     t.start()
 
+
 # ==========================================
 # 2. ТАНЗИМ ВА БОТИ ТЕЛЕГРАМ
 # ==========================================
+
 TOKEN = os.environ.get(
     "BOT_TOKEN",
-    "8685830202:AAEulXqhwGL0y9N-saKSCBgcjfm0UtWIU"
+    "PUT_YOUR_BOT_TOKEN_HERE"
 )
 
 ADMIN_ID = 6871575684
@@ -59,6 +61,7 @@ DEFAULT_BAD_WORDS = [
     'gom', 'гойда', 'кси м', 'goyda', 'ксти'
 ]
 
+
 # ==========================================
 # 3. ИДОРАИ БАЗАҲО
 # ==========================================
@@ -75,7 +78,12 @@ def load_pm_messages():
 
 def save_pm_messages(data):
     with open(FILE_PM_MESSAGES, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
 
 
 PM_DATA = load_pm_messages()
@@ -93,7 +101,12 @@ def load_settings():
 
 def save_settings(settings):
     with open(FILE_SETTINGS, "w", encoding="utf-8") as f:
-        json.dump(settings, f, ensure_ascii=False, indent=4)
+        json.dump(
+            settings,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
 
 
 SETTINGS = load_settings()
@@ -106,12 +119,18 @@ def load_bad_words():
                 return json.load(f)
             except:
                 return DEFAULT_BAD_WORDS.copy()
+
     return DEFAULT_BAD_WORDS.copy()
 
 
 def save_bad_words(words_list):
     with open(FILE_BAD_WORDS, "w", encoding="utf-8") as f:
-        json.dump(words_list, f, ensure_ascii=False, indent=4)
+        json.dump(
+            words_list,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
 
 
 BAD_WORDS = load_bad_words()
@@ -123,8 +142,15 @@ BAD_WORDS = load_bad_words()
 
 def load_qa():
     if os.path.exists(FILE_QA):
-        with open(FILE_QA, "r", encoding="utf-8") as f:
+
+        with open(
+            FILE_QA,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             try:
+
                 data = json.load(f)
 
                 if isinstance(data, list):
@@ -139,14 +165,26 @@ def load_qa():
 
 
 def save_qa():
-    with open(FILE_QA, "w", encoding="utf-8") as f:
-        json.dump(QA_DATA, f, ensure_ascii=False, indent=4)
+
+    with open(
+        FILE_QA,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            QA_DATA,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
 
 
 QA_DATA = load_qa()
 
 
 def normalize_qa_text(text):
+
     if not text:
         return ""
 
@@ -169,9 +207,11 @@ def normalize_qa_text(text):
 
 
 def cleanup_qa():
+
     global QA_DATA
 
     current_time = time.time()
+
     cleaned = []
 
     for item in QA_DATA:
@@ -179,14 +219,29 @@ def cleanup_qa():
         if not isinstance(item, dict):
             continue
 
-        question = item.get("question", "").strip()
-        answer = item.get("answer", "").strip()
+        question = item.get(
+            "question",
+            ""
+        ).strip()
+
+        answer = item.get(
+            "answer",
+            ""
+        ).strip()
 
         if not question or not answer:
             continue
 
-        max_uses = item.get("max_uses", 2)
-        use_count = item.get("use_count", 0)
+        max_uses = item.get(
+            "max_uses",
+            10
+        )
+
+        use_count = item.get(
+            "use_count",
+            0
+        )
+
         item_time = item.get(
             "time",
             current_time
@@ -195,7 +250,7 @@ def cleanup_qa():
         try:
             max_uses = int(max_uses)
         except:
-            max_uses = 2
+            max_uses = 10
 
         try:
             use_count = int(use_count)
@@ -205,9 +260,12 @@ def cleanup_qa():
         if max_uses < 1:
             max_uses = 1
 
-        is_expired = (
-            current_time - item_time
-        ) > CLEANUP_INTERVAL_SECONDS
+        try:
+            is_expired = (
+                current_time - float(item_time)
+            ) > CLEANUP_INTERVAL_SECONDS
+        except:
+            is_expired = False
 
         if (
             use_count < max_uses
@@ -220,6 +278,7 @@ def cleanup_qa():
             cleaned.append(item)
 
     QA_DATA = cleaned
+
     save_qa()
 
 
@@ -227,23 +286,13 @@ cleanup_qa()
 
 
 def find_qa_match(text):
-    """
-    Саволу ҷавоби дастиро меёбад.
-
-    Агар савол як калима бошад:
-        салом
-    пас ба ҳар паёме, ки калимаи салом дорад,
-    ҷавоб медиҳад.
-
-    Агар савол чанд калима бошад:
-        ҳолат чӣ хел
-    бот мувофиқати калимаҳои саволро месанҷад.
-    """
 
     if not text:
         return None
 
-    clean_text = normalize_qa_text(text)
+    clean_text = normalize_qa_text(
+        text
+    )
 
     if not clean_text:
         return None
@@ -284,21 +333,40 @@ def find_qa_match(text):
         if not q_words:
             continue
 
-        max_uses = item.get(
-            "max_uses",
-            2
-        )
+        try:
+            max_uses = int(
+                item.get(
+                    "max_uses",
+                    10
+                )
+            )
+        except:
+            max_uses = 10
 
-        use_count = item.get(
-            "use_count",
-            0
-        )
+        try:
+            use_count = int(
+                item.get(
+                    "use_count",
+                    0
+                )
+            )
+        except:
+            use_count = 0
 
         if use_count >= max_uses:
             continue
 
-        # Саволи яккалимаӣ:
-        # мисол "салом" -> ҳар паёме, ки "салом" дорад
+        # ==================================
+        # САВОЛИ ЯККАЛИМА
+        # Мисол:
+        # савол = салом
+        #
+        # Паём:
+        # салом бародар
+        #
+        # Бот ҷавоб медиҳад.
+        # ==================================
+
         if len(q_words) == 1:
 
             one_word = next(
@@ -316,8 +384,6 @@ def find_qa_match(text):
                 )
             )
 
-            # Барои саволҳои бисёркалимаӣ
-            # ҳадди ақал 2 калима мувофиқат кунад.
             required = min(
                 2,
                 len(q_words)
@@ -330,35 +396,92 @@ def find_qa_match(text):
 
 
 # ==========================================
-# ANSWERS — СИСТЕМАИ КУҲНАИ REPLY
+# ANSWERS — СИСТЕМАИ АВТОМӮЗИИ КУҲНА
 # ==========================================
 
 def cleanup_old_answers(data):
+
     current_time = time.time()
+
     cleaned_data = {}
 
     for key, questions in data.items():
+
         cleaned_questions = {}
 
+        if not isinstance(
+            questions,
+            dict
+        ):
+            continue
+
         for q, responses in questions.items():
+
             valid_responses = []
 
-            if isinstance(responses, list):
+            if isinstance(
+                responses,
+                list
+            ):
+
                 for item in responses:
 
-                    if isinstance(item, dict) and "text" in item:
-                        max_uses = item.get("max_uses", 2)
-                        use_count = item.get("use_count", 0)
-                        item_time = item.get("time", current_time)
+                    if (
+                        isinstance(item, dict)
+                        and "text" in item
+                    ):
 
-                        is_expired = (
-                            current_time - item_time
-                        ) > CLEANUP_INTERVAL_SECONDS
+                        max_uses = item.get(
+                            "max_uses",
+                            2
+                        )
 
-                        if use_count < max_uses and not is_expired:
-                            valid_responses.append(item)
+                        use_count = item.get(
+                            "use_count",
+                            0
+                        )
 
-                    elif isinstance(item, str):
+                        item_time = item.get(
+                            "time",
+                            current_time
+                        )
+
+                        try:
+                            max_uses = int(
+                                max_uses
+                            )
+                        except:
+                            max_uses = 2
+
+                        try:
+                            use_count = int(
+                                use_count
+                            )
+                        except:
+                            use_count = 0
+
+                        try:
+                            is_expired = (
+                                current_time
+                                - float(item_time)
+                            ) > CLEANUP_INTERVAL_SECONDS
+                        except:
+                            is_expired = False
+
+                        if (
+                            use_count < max_uses
+                            and not is_expired
+                        ):
+
+                            valid_responses.append(
+                                item
+                            )
+
+                    elif isinstance(
+                        item,
+                        str
+                    ):
+
                         valid_responses.append({
                             "text": item,
                             "time": current_time,
@@ -367,31 +490,60 @@ def cleanup_old_answers(data):
                         })
 
             if valid_responses:
-                cleaned_questions[q] = valid_responses
+
+                cleaned_questions[q] = (
+                    valid_responses
+                )
 
         if cleaned_questions:
-            cleaned_data[key] = cleaned_questions
+
+            cleaned_data[key] = (
+                cleaned_questions
+            )
 
     return cleaned_data
 
 
 def load_answers():
-    if os.path.exists(FILE_ANSWERS):
-        with open(FILE_ANSWERS, "r", encoding="utf-8") as f:
+
+    if os.path.exists(
+        FILE_ANSWERS
+    ):
+
+        with open(
+            FILE_ANSWERS,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             try:
+
                 data = json.load(f)
-                return cleanup_old_answers(data)
-            except Exception as e:
-                print(
-                    f"Хатогӣ ҳангоми боркунии базаи саволҳо: {e}"
+
+                return cleanup_old_answers(
+                    data
                 )
+
+            except Exception as e:
+
+                print(
+                    f"Хатогӣ ҳангоми боркунии "
+                    f"базаи саволҳо: {e}"
+                )
+
                 return {}
 
     return {}
 
 
 def save_answers():
-    with open(FILE_ANSWERS, "w", encoding="utf-8") as f:
+
+    with open(
+        FILE_ANSWERS,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
         json.dump(
             ANSWERS,
             f,
@@ -401,12 +553,25 @@ def save_answers():
 
 
 def load_groups():
-    if os.path.exists(FILE_GROUPS):
-        with open(FILE_GROUPS, "r", encoding="utf-8") as f:
+
+    if os.path.exists(
+        FILE_GROUPS
+    ):
+
+        with open(
+            FILE_GROUPS,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
             try:
+
                 data = json.load(f)
 
-                if isinstance(data, dict):
+                if isinstance(
+                    data,
+                    dict
+                ):
                     return data
 
                 return {}
@@ -418,7 +583,13 @@ def load_groups():
 
 
 def save_groups(groups_dict):
-    with open(FILE_GROUPS, "w", encoding="utf-8") as f:
+
+    with open(
+        FILE_GROUPS,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
         json.dump(
             groups_dict,
             f,
@@ -432,49 +603,78 @@ ANSWERS = load_answers()
 BOT_USERNAME = None
 
 try:
+
     BOT_USERNAME = bot.get_me().username
+
 except Exception as e:
+
     print(
-        f"Хатогӣ ҳангоми гирифтани номи бот: {e}"
+        f"Хатогӣ ҳангоми гирифтани "
+        f"номи бот: {e}"
     )
 
 
 def escape_html(text):
+
     if not text:
         return ""
 
     return (
         str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
+        .replace(
+            "&",
+            "&amp;"
+        )
+        .replace(
+            "<",
+            "&lt;"
+        )
+        .replace(
+            ">",
+            "&gt;"
+        )
     )
 
 
 def send_to_owner(text):
+
     try:
+
         bot.send_message(
             ADMIN_ID,
             text,
             parse_mode="HTML",
             disable_web_page_preview=True
         )
+
     except Exception as e:
+
         print(
-            f"⚠️ Хатогӣ ҳангоми фиристодани паём "
-            f"ба соҳиби бот: {e}"
+            f"⚠️ Хатогӣ ҳангоми фиристодани "
+            f"паём ба соҳиби бот: {e}"
         )
 
 
-def is_user_admin(chat_id, user_id, sender_chat=None):
+def is_user_admin(
+    chat_id,
+    user_id,
+    sender_chat=None
+):
 
-    if sender_chat and sender_chat.id == chat_id:
+    if (
+        sender_chat
+        and sender_chat.id == chat_id
+    ):
         return True
 
-    if user_id == ADMIN_ID or user_id == 777000:
+    if (
+        user_id == ADMIN_ID
+        or user_id == 777000
+    ):
         return True
 
     try:
+
         member = bot.get_chat_member(
             chat_id,
             user_id
@@ -487,9 +687,11 @@ def is_user_admin(chat_id, user_id, sender_chat=None):
             return True
 
     except Exception as e:
+
         print(
-            f"⚠️ Хатогӣ ҳангоми санҷиши ҳуқуқи "
-            f"админии корбар {user_id}: {e}"
+            f"⚠️ Хатогӣ ҳангоми санҷиши "
+            f"ҳуқуқи админии корбар "
+            f"{user_id}: {e}"
         )
 
     return False
@@ -497,7 +699,9 @@ def is_user_admin(chat_id, user_id, sender_chat=None):
 
 def has_bad_words(text):
 
-    text_lower = text.lower()
+    text_lower = (
+        text or ""
+    ).lower()
 
     for word in BAD_WORDS:
 
@@ -527,6 +731,8 @@ def has_bad_words(text):
 
 def has_link(text):
 
+    text = text or ""
+
     link_pattern = (
         r"(https?://\S+|www\.\S+|t\.me/\S+|"
         r"telegram\.me/\S+|\w+\.tj\b|\w+\.ru\b|"
@@ -542,10 +748,11 @@ def has_link(text):
 
 
 def has_username(text):
+
     return bool(
         re.search(
             r"@\w+",
-            text
+            text or ""
         )
     )
 
@@ -561,15 +768,18 @@ def restrict_user(
         + (hours * 3600)
     )
 
-    permissions = telebot.types.ChatPermissions(
-        can_send_messages=False,
-        can_send_media_messages=False,
-        can_send_polls=False,
-        can_send_other_messages=False,
-        can_add_web_page_previews=False
+    permissions = (
+        telebot.types.ChatPermissions(
+            can_send_messages=False,
+            can_send_media_messages=False,
+            can_send_polls=False,
+            can_send_other_messages=False,
+            can_add_web_page_previews=False
+        )
     )
 
     try:
+
         bot.restrict_chat_member(
             chat_id,
             user_id,
@@ -578,6 +788,7 @@ def restrict_user(
         )
 
     except Exception as e:
+
         print(
             f"Хатогӣ ҳангоми мут: {e}"
         )
@@ -588,16 +799,29 @@ def get_add_to_group_keyboard():
     global BOT_USERNAME
 
     if not BOT_USERNAME:
-        BOT_USERNAME = bot.get_me().username
 
-    markup = telebot.types.InlineKeyboardMarkup()
+        BOT_USERNAME = (
+            bot.get_me().username
+        )
 
-    btn_add = telebot.types.InlineKeyboardButton(
-        "➕ Илова кардан ба гурӯҳ",
-        url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
+    markup = (
+        telebot.types.InlineKeyboardMarkup()
     )
 
-    markup.add(btn_add)
+    btn_add = (
+        telebot.types.InlineKeyboardButton(
+            "➕ Илова кардан ба гурӯҳ",
+            url=(
+                f"https://t.me/"
+                f"{BOT_USERNAME}"
+                f"?startgroup=true"
+            )
+        )
+    )
+
+    markup.add(
+        btn_add
+    )
 
     return markup
 
@@ -611,21 +835,32 @@ def get_group_link(chat_id):
         )
 
         if chat_obj.invite_link:
+
             return chat_obj.invite_link
 
         elif chat_obj.username:
-            return f"https://t.me/{chat_obj.username}"
+
+            return (
+                f"https://t.me/"
+                f"{chat_obj.username}"
+            )
 
         else:
 
             try:
-                return bot.export_chat_invite_link(
-                    int(chat_id)
+
+                return (
+                    bot.export_chat_invite_link(
+                        int(chat_id)
+                    )
                 )
+
             except:
+
                 return None
 
     except:
+
         return None
 
 
@@ -638,75 +873,116 @@ def send_main_menu(
     user_id
 ):
 
-    markup = telebot.types.InlineKeyboardMarkup()
+    global BOT_USERNAME
 
-    # ======================================
-    # 1. ИЛОВА КАРДАН БА ГУРӮҲ
-    # ======================================
+    markup = (
+        telebot.types.InlineKeyboardMarkup()
+    )
 
     if user_id == ADMIN_ID:
 
         if not BOT_USERNAME:
+
             try:
-                BOT_USERNAME = bot.get_me().username
+
+                BOT_USERNAME = (
+                    bot.get_me().username
+                )
+
             except:
+
                 pass
 
-        btn_add = telebot.types.InlineKeyboardButton(
-            "➕ Илова кардан ба гурӯҳ",
-            url=f"https://t.me/{BOT_USERNAME}?startgroup=true"
-        )
-
-        markup.add(btn_add)
-
         # ==================================
-        # 2. ГУРӮҲҲО
+        # 1
         # ==================================
 
-        btn_admin = telebot.types.InlineKeyboardButton(
-            "📊 Гурӯҳҳо",
-            callback_data="admin_groups"
-        )
-
-        # ==================================
-        # 3. КОРБАРОН ЛС
-        # ==================================
-
-        btn_pm_users = telebot.types.InlineKeyboardButton(
-            "📩 Корбарон (ЛС)",
-            callback_data="admin_pm_users"
+        btn_add = (
+            telebot.types.InlineKeyboardButton(
+                "➕ Илова кардан ба гурӯҳ",
+                url=(
+                    f"https://t.me/"
+                    f"{BOT_USERNAME}"
+                    f"?startgroup=true"
+                )
+            )
         )
 
         # ==================================
-        # 4. ХУДОМӮЗӢ
+        # 2
         # ==================================
 
-        btn_hudomez = telebot.types.InlineKeyboardButton(
-            "⚡ Худомӯзӣ",
-            callback_data="admin_hudomez_menu"
+        btn_groups = (
+            telebot.types.InlineKeyboardButton(
+                "📊 Гурӯҳҳо",
+                callback_data="admin_groups"
+            )
         )
 
         # ==================================
-        # 5. ПАРАМЕТРҲО
+        # 3
         # ==================================
 
-        btn_params = telebot.types.InlineKeyboardButton(
-            "⚙️ Параметрҳо",
-            callback_data="admin_params"
+        btn_pm_users = (
+            telebot.types.InlineKeyboardButton(
+                "📩 Корбарон (ЛС)",
+                callback_data="admin_pm_users"
+            )
         )
 
-        markup.add(btn_admin)
-        markup.add(btn_pm_users)
-        markup.add(btn_hudomez)
-        markup.add(btn_params)
+        # ==================================
+        # 4
+        # ==================================
+
+        btn_hudomez = (
+            telebot.types.InlineKeyboardButton(
+                "⚡ Худомӯзӣ",
+                callback_data="admin_hudomez_menu"
+            )
+        )
+
+        # ==================================
+        # 5
+        # ==================================
+
+        btn_params = (
+            telebot.types.InlineKeyboardButton(
+                "⚙️ Параметрҳо",
+                callback_data="admin_params"
+            )
+        )
+
+        markup.add(
+            btn_add
+        )
+
+        markup.add(
+            btn_groups
+        )
+
+        markup.add(
+            btn_pm_users
+        )
+
+        markup.add(
+            btn_hudomez
+        )
+
+        markup.add(
+            btn_params
+        )
 
     else:
 
-        markup = get_add_to_group_keyboard()
+        markup = (
+            get_add_to_group_keyboard()
+        )
 
     welcome_text = (
-        "<b>Салом! Хуш омадед ба боти муҳофиз! 👋🤖</b>\n\n"
-        "Ман гурӯҳҳои шуморо аз реклама, дашном ва спам муҳофизат карда, "
+        "<b>Салом! Хуш омадед ба "
+        "боти муҳофиз! 👋🤖</b>\n\n"
+        "Ман гурӯҳҳои шуморо аз реклама, "
+        "дашном ва спам муҳофизат карда, "
         "бо шумо дар гурух хамсухбат мешавам!"
     )
 
@@ -731,6 +1007,7 @@ def start(message):
         return
 
     if message.from_user.id in admin_states:
+
         admin_states.pop(
             message.from_user.id
         )
@@ -749,45 +1026,70 @@ def start(message):
 
     user_id = message.from_user.id
 
-    str_u_id = str(user_id)
+    str_u_id = str(
+        user_id
+    )
 
     if str_u_id not in PM_DATA:
 
         PM_DATA[str_u_id] = {
+
             "user_id": user_id,
+
             "name": user_name,
+
             "username": user_username,
+
             "first_name": (
                 message.from_user.first_name
                 or ""
             ),
+
             "last_name": (
                 message.from_user.last_name
                 or ""
             ),
+
             "messages": [],
+
             "last_updated": time.time()
         }
 
     else:
 
-        PM_DATA[str_u_id]["user_id"] = user_id
-        PM_DATA[str_u_id]["name"] = user_name
-        PM_DATA[str_u_id]["username"] = user_username
+        PM_DATA[str_u_id]["user_id"] = (
+            user_id
+        )
+
+        PM_DATA[str_u_id]["name"] = (
+            user_name
+        )
+
+        PM_DATA[str_u_id]["username"] = (
+            user_username
+        )
+
         PM_DATA[str_u_id]["first_name"] = (
             message.from_user.first_name
             or ""
         )
+
         PM_DATA[str_u_id]["last_name"] = (
             message.from_user.last_name
             or ""
         )
-        PM_DATA[str_u_id]["last_updated"] = time.time()
+
+        PM_DATA[str_u_id]["last_updated"] = (
+            time.time()
+        )
 
     if "messages" not in PM_DATA[str_u_id]:
+
         PM_DATA[str_u_id]["messages"] = []
 
-    save_pm_messages(PM_DATA)
+    save_pm_messages(
+        PM_DATA
+    )
 
     if user_id != ADMIN_ID:
 
@@ -826,6 +1128,7 @@ def callback_inline(call):
     global QA_DATA
 
     user_id = call.from_user.id
+
     chat_id = call.message.chat.id
 
     if (
@@ -848,16 +1151,20 @@ def callback_inline(call):
     if call.data == "main_menu":
 
         if user_id in admin_states:
+
             admin_states.pop(
                 user_id
             )
 
         try:
+
             bot.delete_message(
                 chat_id,
                 call.message.message_id
             )
+
         except:
+
             pass
 
         send_main_menu(
@@ -879,7 +1186,8 @@ def callback_inline(call):
 
             bot.answer_callback_query(
                 call.id,
-                "📩 Ҳеҷ паёме аз корбарон дар ЛС сабт нашудааст.",
+                "📩 Ҳеҷ паёме аз корбарон "
+                "дар ЛС сабт нашудааст.",
                 show_alert=True
             )
 
@@ -894,8 +1202,10 @@ def callback_inline(call):
             reverse=True
         )
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
         counter = 1
@@ -919,23 +1229,33 @@ def callback_inline(call):
                 f"({msg_count} паём)"
             )
 
-            btn = telebot.types.InlineKeyboardButton(
-                btn_text,
-                callback_data=f"admin_view_pm_{target_id}"
+            btn = (
+                telebot.types.InlineKeyboardButton(
+                    btn_text,
+                    callback_data=(
+                        f"admin_view_pm_{target_id}"
+                    )
+                )
             )
 
-            markup.add(btn)
+            markup.add(
+                btn
+            )
 
             counter += 1
 
-        btn_send_all_pm = telebot.types.InlineKeyboardButton(
-            "📢 Паём ба ҳамаи корбарон",
-            callback_data="admin_send_all_pm"
+        btn_send_all_pm = (
+            telebot.types.InlineKeyboardButton(
+                "📢 Паём ба ҳамаи корбарон",
+                callback_data="admin_send_all_pm"
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="main_menu"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="main_menu"
+            )
         )
 
         markup.add(
@@ -949,8 +1269,8 @@ def callback_inline(call):
             text=(
                 "📩 <b>Рӯйхати корбароне, "
                 "ки ба бот паём навиштаанд:</b>\n\n"
-                "<i>Барои дидани паёмҳо ва ҷавоб додан "
-                "корбарро интихоб кунед:</i>"
+                "<i>Барои дидани паёмҳо ва ҷавоб "
+                "додан корбарро интихоб кунед:</i>"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -1024,24 +1344,31 @@ def callback_inline(call):
             )
 
             if msg_type == "photo":
+
                 content = "🖼 Акс"
 
             elif msg_type == "video":
+
                 content = "🎥 Видео"
 
             elif msg_type == "document":
+
                 content = "📄 Файл"
 
             elif msg_type == "audio":
+
                 content = "🎵 Audio"
 
             elif msg_type == "voice":
+
                 content = "🎤 Voice"
 
             elif msg_type == "sticker":
+
                 content = "🎭 Стикер"
 
             else:
+
                 content = escape_html(
                     m.get(
                         "text",
@@ -1054,6 +1381,12 @@ def callback_inline(call):
                 f"{content}\n"
             )
 
+        if not formatted_msgs:
+
+            formatted_msgs = (
+                "<i>Таърихи чат холӣ аст.</i>"
+            )
+
         info_text = (
             f"👤 <b>Ном:</b> {u_name}\n"
             f"🏷 <b>Никнейм:</b> {u_username}\n"
@@ -1061,41 +1394,54 @@ def callback_inline(call):
             f"-----------------------------------\n"
             f"💬 <b>Таърихи паёмҳо:</b>\n\n"
             f"{formatted_msgs}\n"
-            f"<i>✍️ Барои ҷавоб додан ё тоза кардани "
-            f"чат тугмаи зерро истифода баред.</i>"
+            f"<i>Барои ҷавоб додан ё тоза "
+            f"кардани чат тугмаи зерро истифода баред.</i>"
         )
 
-        admin_states[user_id] = {
-            "action": "reply_to_pm",
-            "target_id": target_id
-        }
-
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
         # ==================================
-        # НАВ: ТОЗА КАРДАНИ ЧАТ
+        # ПЕШ АЗ ҶАВОБ — ТОЗА КАРДАН
         # ==================================
 
-        btn_delete_chat = telebot.types.InlineKeyboardButton(
-            "🗑 Тоза кардани чат",
-            callback_data=f"admin_delete_pm_{target_id}"
+        btn_delete_chat = (
+            telebot.types.InlineKeyboardButton(
+                "🗑 Тоза кардани чат",
+                callback_data=(
+                    f"admin_delete_pm_{target_id}"
+                )
+            )
         )
 
-        btn_reply = telebot.types.InlineKeyboardButton(
-            "✍️ Ҷавоб додан ба корбар",
-            callback_data=f"admin_reply_pm_{target_id}"
+        btn_reply = (
+            telebot.types.InlineKeyboardButton(
+                "✍️ Ҷавоб додан ба корбар",
+                callback_data=(
+                    f"admin_reply_pm_{target_id}"
+                )
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="admin_pm_users"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_pm_users"
+            )
         )
 
         markup.add(
-            btn_delete_chat,
-            btn_reply,
+            btn_delete_chat
+        )
+
+        markup.add(
+            btn_reply
+        )
+
+        markup.add(
             btn_cancel
         )
 
@@ -1112,7 +1458,7 @@ def callback_inline(call):
         )
 
     # ======================================
-    # ТОЗА КАРДАНИ ЧАТИ КОРБАР
+    # ТОЗА КАРДАНИ ЧАТ
     # ======================================
 
     elif call.data.startswith(
@@ -1126,14 +1472,21 @@ def callback_inline(call):
 
         if target_id in PM_DATA:
 
+            # Танҳо таърихи сабтшудаи бот тоза мешавад.
+            # Худи паёмҳои Telegram нест намешаванд.
+
             PM_DATA[target_id]["messages"] = []
-            PM_DATA[target_id]["last_updated"] = time.time()
+
+            PM_DATA[target_id]["last_updated"] = (
+                time.time()
+            )
 
             save_pm_messages(
                 PM_DATA
             )
 
         if user_id in admin_states:
+
             admin_states.pop(
                 user_id
             )
@@ -1144,7 +1497,6 @@ def callback_inline(call):
             show_alert=True
         )
 
-        # Аз нав нишон додани маълумоти корбар
         u_info = PM_DATA.get(
             target_id
         )
@@ -1175,21 +1527,27 @@ def callback_inline(call):
             f"<i>Чат тоза карда шуд.</i>"
         )
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
                 "🗑 Тоза кардани чат",
-                callback_data=f"admin_delete_pm_{target_id}"
+                callback_data=(
+                    f"admin_delete_pm_{target_id}"
+                )
             )
         )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
                 "✍️ Ҷавоб додан ба корбар",
-                callback_data=f"admin_reply_pm_{target_id}"
+                callback_data=(
+                    f"admin_reply_pm_{target_id}"
+                )
             )
         )
 
@@ -1201,6 +1559,7 @@ def callback_inline(call):
         )
 
         try:
+
             bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=call.message.message_id,
@@ -1208,7 +1567,9 @@ def callback_inline(call):
                 parse_mode="HTML",
                 reply_markup=markup
             )
+
         except:
+
             pass
 
     # ======================================
@@ -1229,12 +1590,16 @@ def callback_inline(call):
             "target_id": target_id
         }
 
-        markup = telebot.types.InlineKeyboardMarkup()
+        markup = (
+            telebot.types.InlineKeyboardMarkup()
+        )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
                 "❌ Бекор кардан",
-                callback_data=f"admin_view_pm_{target_id}"
+                callback_data=(
+                    f"admin_view_pm_{target_id}"
+                )
             )
         )
 
@@ -1245,8 +1610,8 @@ def callback_inline(call):
                 f"Он ба корбари ID: "
                 f"<code>{target_id}</code> равон карда мешавад.\n\n"
                 "📝 Матн, 🖼 акс, 🎥 видео, "
-                "📄 файл, 🎵 audio ё 🎤 voice "
-                "фиристода метавонед."
+                "📄 файл, 🎵 audio, 🎤 voice "
+                "ё 🎭 sticker фиристода метавонед."
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -1266,7 +1631,9 @@ def callback_inline(call):
             "action": "wait_broadcast_pm"
         }
 
-        markup = telebot.types.InlineKeyboardMarkup()
+        markup = (
+            telebot.types.InlineKeyboardMarkup()
+        )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
@@ -1281,8 +1648,11 @@ def callback_inline(call):
             text=(
                 "📢 <b>Лутфан паёмеро, ки мехоҳед "
                 "ба ҲАМАИ корбарони ЛС фиристед, равон кунед:</b>\n\n"
-                "📝 Матн, 🖼 акс, 🎥 видео, 📄 файл, "
-                "🎭 стикер ва дигар media-ҳоро фиристода метавонед."
+                "📝 Матн\n"
+                "🖼 Акс\n"
+                "🎥 Видео\n"
+                "📄 Файл\n"
+                "🎭 Стикер"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -1310,27 +1680,39 @@ def callback_inline(call):
 
             return
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
         for g_id, g_name in groups.items():
 
-            btn = telebot.types.InlineKeyboardButton(
-                f"👥 {g_name}",
-                callback_data=f"admin_view_group_{g_id}"
+            btn = (
+                telebot.types.InlineKeyboardButton(
+                    f"👥 {g_name}",
+                    callback_data=(
+                        f"admin_view_group_{g_id}"
+                    )
+                )
             )
 
-            markup.add(btn)
+            markup.add(
+                btn
+            )
 
-        btn_broadcast = telebot.types.InlineKeyboardButton(
-            "📢 Паём ба ҳама гурӯҳҳо",
-            callback_data="admin_send_all"
+        btn_broadcast = (
+            telebot.types.InlineKeyboardButton(
+                "📢 Паём ба ҳама гурӯҳҳо",
+                callback_data="admin_send_all"
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="main_menu"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="main_menu"
+            )
         )
 
         markup.add(
@@ -1360,28 +1742,38 @@ def callback_inline(call):
 
     elif call.data == "admin_params":
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
-        btn_blocked = telebot.types.InlineKeyboardButton(
-            "🚫 Корбарони блокшуда",
-            callback_data="admin_blocked_users"
+        btn_blocked = (
+            telebot.types.InlineKeyboardButton(
+                "🚫 Корбарони блокшуда",
+                callback_data="admin_blocked_users"
+            )
         )
 
-        btn_badwords = telebot.types.InlineKeyboardButton(
-            "🤬 Калимаҳои ноҷо",
-            callback_data="admin_bad_words_menu"
+        btn_badwords = (
+            telebot.types.InlineKeyboardButton(
+                "🤬 Калимаҳои ноҷо",
+                callback_data="admin_bad_words_menu"
+            )
         )
 
-        btn_refresh = telebot.types.InlineKeyboardButton(
-            "🔄 Навсозии гурӯҳҳо",
-            callback_data="admin_refresh_groups"
+        btn_refresh = (
+            telebot.types.InlineKeyboardButton(
+                "🔄 Навсозии гурӯҳҳо",
+                callback_data="admin_refresh_groups"
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="main_menu"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="main_menu"
+            )
         )
 
         markup.add(
@@ -1412,28 +1804,50 @@ def callback_inline(call):
 
     elif call.data == "admin_hudomez_menu":
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
-        btn_add_qa = telebot.types.InlineKeyboardButton(
-            "1. Илова кардани саволу ҷавоб ➕",
-            callback_data="admin_add_qa"
+        # ==================================
+        # САВОЛУ ҶАВОБ
+        # ==================================
+
+        btn_qa = (
+            telebot.types.InlineKeyboardButton(
+                "💬 Саволу ҷавоб",
+                callback_data="admin_qa_menu"
+            )
         )
 
-        btn_control_qa = telebot.types.InlineKeyboardButton(
-            "2. Идораи саволу ҷавоб ⚙️",
-            callback_data="admin_control_qa"
+        # ==================================
+        # ТАНЗИМИ СИСТЕМАИ АВТОМӮЗӢ
+        # ==================================
+
+        btn_control_qa = (
+            telebot.types.InlineKeyboardButton(
+                "⚙️ Танзими ҷавобдиҳӣ",
+                callback_data="admin_control_qa"
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="main_menu"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="main_menu"
+            )
         )
 
         markup.add(
-            btn_add_qa,
-            btn_control_qa,
+            btn_qa
+        )
+
+        markup.add(
+            btn_control_qa
+        )
+
+        markup.add(
             btn_cancel
         )
 
@@ -1441,8 +1855,80 @@ def callback_inline(call):
             chat_id=chat_id,
             message_id=call.message.message_id,
             text=(
-                "⚡ <b>Бахши «Худомӯзӣ»:</b>\n\n"
-                "Бахши заруриро интихоб кунед:"
+                "⚡ <b>Худомӯзӣ</b>\n\n"
+                "💬 <b>Саволу ҷавоб</b> — "
+                "савол ва ҷавоби дастиро илова ё нест кунед.\n\n"
+                "⚙️ <b>Танзими ҷавобдиҳӣ</b> — "
+                "танзими системаи худомӯзии бот."
+            ),
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+
+        bot.answer_callback_query(
+            call.id
+        )
+
+    # ======================================
+    # МЕНЮИ САВОЛУ ҶАВОБ
+    # ======================================
+
+    elif call.data == "admin_qa_menu":
+
+        cleanup_qa()
+
+        qa_count = len(
+            QA_DATA
+        )
+
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
+        )
+
+        btn_add = (
+            telebot.types.InlineKeyboardButton(
+                "➕ Илова кардани саволу ҷавоб",
+                callback_data="admin_add_qa"
+            )
+        )
+
+        btn_delete = (
+            telebot.types.InlineKeyboardButton(
+                "🗑 Нест кардани саволу ҷавоб",
+                callback_data="admin_delete_qa"
+            )
+        )
+
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_hudomez_menu"
+            )
+        )
+
+        markup.add(
+            btn_add
+        )
+
+        markup.add(
+            btn_delete
+        )
+
+        markup.add(
+            btn_cancel
+        )
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=(
+                f"💬 <b>Саволу ҷавоб</b>\n\n"
+                f"📊 Ҳоло дар база "
+                f"<b>{qa_count}</b> саволу ҷавоб сабт шудааст.\n\n"
+                f"<i>Саволу ҷавоби ин бахш аз системаи "
+                f"худомӯзии автоматӣ ҷудо мебошад.</i>"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -1462,12 +1948,14 @@ def callback_inline(call):
             "action": "wait_qa_question"
         }
 
-        markup = telebot.types.InlineKeyboardMarkup()
+        markup = (
+            telebot.types.InlineKeyboardMarkup()
+        )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
                 "❌ Бекор кардан",
-                callback_data="admin_hudomez_menu"
+                callback_data="admin_qa_menu"
             )
         )
 
@@ -1487,234 +1975,23 @@ def callback_inline(call):
         )
 
     # ======================================
-    # ИДОРАИ САВОЛУ ҶАВОБ
-    # ======================================
-
-    elif call.data == "admin_control_qa":
-
-        cleanup_qa()
-
-        qa_count = len(
-            QA_DATA
-        )
-
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
-        )
-
-        # Намоиши саволу ҷавобҳо
-        if QA_DATA:
-
-            counter = 1
-
-            for index, item in enumerate(QA_DATA):
-
-                question = item.get(
-                    "question",
-                    "Савол"
-                )
-
-                use_count = item.get(
-                    "use_count",
-                    0
-                )
-
-                max_uses = item.get(
-                    "max_uses",
-                    0
-                )
-
-                button_text = (
-                    f"{counter}. "
-                    f"{question[:35]} "
-                    f"({use_count}/{max_uses})"
-                )
-
-                markup.add(
-                    telebot.types.InlineKeyboardButton(
-                        button_text,
-                        callback_data=f"admin_qa_info_{index}"
-                    )
-                )
-
-                counter += 1
-
-        markup.add(
-            telebot.types.InlineKeyboardButton(
-                "➕ Илова кардани саволу ҷавоб",
-                callback_data="admin_add_qa"
-            )
-        )
-
-        markup.add(
-            telebot.types.InlineKeyboardButton(
-                "🗑 Нест кардани саволу ҷавоб",
-                callback_data="admin_delete_qa"
-            )
-        )
-
-        markup.add(
-            telebot.types.InlineKeyboardButton(
-                "❌ Бекор кардан",
-                callback_data="admin_hudomez_menu"
-            )
-        )
-
-        if qa_count:
-
-            text_msg = (
-                f"⚙️ <b>Идораи саволу ҷавоб</b>\n\n"
-                f"📊 Ҳамагӣ сабт шудааст: "
-                f"<b>{qa_count}</b>\n\n"
-                f"<i>Дар назди ҳар савол нишон дода шудааст, "
-                f"ки чанд маротиба истифода шудааст.</i>"
-            )
-
-        else:
-
-            text_msg = (
-                "⚙️ <b>Идораи саволу ҷавоб</b>\n\n"
-                "📊 Ҳамагӣ сабт шудааст: <b>0</b>\n\n"
-                "Ҳоло ягон саволу ҷавоб илова нашудааст."
-            )
-
-        bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=call.message.message_id,
-            text=text_msg,
-            parse_mode="HTML",
-            reply_markup=markup
-        )
-
-        bot.answer_callback_query(
-            call.id
-        )
-
-    # ======================================
-    # ДИДАНИ ЯК САВОЛУ ҶАВОБ
-    # ======================================
-
-    elif call.data.startswith(
-        "admin_qa_info_"
-    ):
-
-        try:
-
-            index = int(
-                call.data.replace(
-                    "admin_qa_info_",
-                    ""
-                )
-            )
-
-        except:
-
-            bot.answer_callback_query(
-                call.id,
-                "❌ Хато!",
-                show_alert=True
-            )
-
-            return
-
-        cleanup_qa()
-
-        if (
-            index < 0
-            or index >= len(QA_DATA)
-        ):
-
-            bot.answer_callback_query(
-                call.id,
-                "❌ Саволу ҷавоб ёфт нашуд.",
-                show_alert=True
-            )
-
-            return
-
-        item = QA_DATA[index]
-
-        question = escape_html(
-            item.get(
-                "question",
-                ""
-            )
-        )
-
-        answer = escape_html(
-            item.get(
-                "answer",
-                ""
-            )
-        )
-
-        use_count = item.get(
-            "use_count",
-            0
-        )
-
-        max_uses = item.get(
-            "max_uses",
-            0
-        )
-
-        info_text = (
-            "❓ <b>Савол:</b>\n"
-            f"{question}\n\n"
-            "💬 <b>Ҷавоб:</b>\n"
-            f"{answer}\n\n"
-            f"🔢 <b>Истифода:</b> "
-            f"{use_count}/{max_uses}"
-        )
-
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
-        )
-
-        markup.add(
-            telebot.types.InlineKeyboardButton(
-                "🗑 Нест кардани ин саволу ҷавоб",
-                callback_data=f"admin_delete_qa_one_{index}"
-            )
-        )
-
-        markup.add(
-            telebot.types.InlineKeyboardButton(
-                "❌ Бекор кардан",
-                callback_data="admin_control_qa"
-            )
-        )
-
-        bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=call.message.message_id,
-            text=info_text,
-            parse_mode="HTML",
-            reply_markup=markup
-        )
-
-        bot.answer_callback_query(
-            call.id
-        )
-
-    # ======================================
-    # МЕНЮИ НЕСТ КАРДАНИ САВОЛУ ҶАВОБ
+    # НЕСТ КАРДАНИ САВОЛУ ҶАВОБ
     # ======================================
 
     elif call.data == "admin_delete_qa":
 
         cleanup_qa()
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
-        )
-
         if not QA_DATA:
+
+            markup = (
+                telebot.types.InlineKeyboardMarkup()
+            )
 
             markup.add(
                 telebot.types.InlineKeyboardButton(
                     "❌ Бекор кардан",
-                    callback_data="admin_control_qa"
+                    callback_data="admin_qa_menu"
                 )
             )
 
@@ -1723,7 +2000,7 @@ def callback_inline(call):
                 message_id=call.message.message_id,
                 text=(
                     "🗑 <b>Нест кардани саволу ҷавоб</b>\n\n"
-                    "Ҳоло ягон саволу ҷавоб сабт нашудааст."
+                    "📊 Ҳоло ягон саволу ҷавоб сабт нашудааст."
                 ),
                 parse_mode="HTML",
                 reply_markup=markup
@@ -1735,7 +2012,15 @@ def callback_inline(call):
 
             return
 
-        for index, item in enumerate(QA_DATA):
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
+        )
+
+        for index, item in enumerate(
+            QA_DATA
+        ):
 
             question = item.get(
                 "question",
@@ -1745,14 +2030,16 @@ def callback_inline(call):
             markup.add(
                 telebot.types.InlineKeyboardButton(
                     f"🗑 {question[:45]}",
-                    callback_data=f"admin_delete_qa_one_{index}"
+                    callback_data=(
+                        f"admin_delete_qa_one_{index}"
+                    )
                 )
             )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
                 "❌ Бекор кардан",
-                callback_data="admin_control_qa"
+                callback_data="admin_qa_menu"
             )
         )
 
@@ -1761,8 +2048,8 @@ def callback_inline(call):
             message_id=call.message.message_id,
             text=(
                 "🗑 <b>Нест кардани саволу ҷавоб</b>\n\n"
-                "Саволеро интихоб кунед, ки мехоҳед "
-                "пурра нест шавад:"
+                f"📊 Ҳамагӣ: <b>{len(QA_DATA)}</b>\n\n"
+                "Саволеро интихоб кунед:"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -1814,9 +2101,11 @@ def callback_inline(call):
 
             return
 
-        deleted_question = QA_DATA[index].get(
-            "question",
-            ""
+        deleted_question = (
+            QA_DATA[index].get(
+                "question",
+                ""
+            )
         )
 
         QA_DATA.pop(
@@ -1831,47 +2120,15 @@ def callback_inline(call):
             show_alert=True
         )
 
-        # Баргаштан ба идораи Q&A
-        cleanup_qa()
-
         qa_count = len(
             QA_DATA
         )
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
-
-        if QA_DATA:
-
-            counter = 1
-
-            for i, item in enumerate(QA_DATA):
-
-                question = item.get(
-                    "question",
-                    "Савол"
-                )
-
-                use_count = item.get(
-                    "use_count",
-                    0
-                )
-
-                max_uses = item.get(
-                    "max_uses",
-                    0
-                )
-
-                markup.add(
-                    telebot.types.InlineKeyboardButton(
-                        f"{counter}. {question[:35]} "
-                        f"({use_count}/{max_uses})",
-                        callback_data=f"admin_qa_info_{i}"
-                    )
-                )
-
-                counter += 1
 
         markup.add(
             telebot.types.InlineKeyboardButton(
@@ -1898,14 +2155,99 @@ def callback_inline(call):
             chat_id=chat_id,
             message_id=call.message.message_id,
             text=(
-                f"⚙️ <b>Идораи саволу ҷавоб</b>\n\n"
-                f"📊 Ҳамагӣ сабт шудааст: "
+                f"💬 <b>Саволу ҷавоб</b>\n\n"
+                f"📊 Ҳоло сабт шудааст: "
                 f"<b>{qa_count}</b>\n\n"
-                f"🗑 Нест шуд: "
+                f"🗑 Нест шуд:\n"
                 f"<code>{escape_html(deleted_question)}</code>"
             ),
             parse_mode="HTML",
             reply_markup=markup
+        )
+
+    # ======================================
+    # ТАНЗИМИ СИСТЕМАИ АВТОҶАВОБ
+    # ======================================
+
+    elif call.data == "admin_control_qa":
+
+        current_value = SETTINGS.get(
+            "min_words_match",
+            2
+        )
+
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
+        )
+
+        markup.add(
+            telebot.types.InlineKeyboardButton(
+                "✏️ Тағйир додан",
+                callback_data="admin_set_match_limit"
+            )
+        )
+
+        markup.add(
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_hudomez_menu"
+            )
+        )
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=(
+                "⚙️ <b>Танзими ҷавобдиҳӣ</b>\n\n"
+                f"🔢 Ҳадди ҳозира: "
+                f"<b>{current_value}</b> калима\n\n"
+                "Ин танзим ба системаи "
+                "худомӯзии автоматии бот дахл дорад."
+            ),
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+
+        bot.answer_callback_query(
+            call.id
+        )
+
+    # ======================================
+    # ТАҒЙИРИ LIMIT АВТОМӮЗӢ
+    # ======================================
+
+    elif call.data == "admin_set_match_limit":
+
+        admin_states[user_id] = {
+            "action": "wait_match_limit"
+        }
+
+        markup = (
+            telebot.types.InlineKeyboardMarkup()
+        )
+
+        markup.add(
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_control_qa"
+            )
+        )
+
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=(
+                "🔢 <b>Рақами ҳадди мувофиқатро нависед:</b>\n\n"
+                "<i>Мисол: 2</i>"
+            ),
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+
+        bot.answer_callback_query(
+            call.id
         )
 
     # ======================================
@@ -1914,11 +2256,14 @@ def callback_inline(call):
 
     elif call.data == "admin_blocked_users":
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
         has_blocked = False
+
         counter = 1
 
         for u_id, data in list(
@@ -1941,18 +2286,26 @@ def callback_inline(call):
                     f"{counter}. {u_name}"
                 )
 
-                btn = telebot.types.InlineKeyboardButton(
-                    btn_text,
-                    callback_data=f"admin_view_blocked_{u_id}"
+                btn = (
+                    telebot.types.InlineKeyboardButton(
+                        btn_text,
+                        callback_data=(
+                            f"admin_view_blocked_{u_id}"
+                        )
+                    )
                 )
 
-                markup.add(btn)
+                markup.add(
+                    btn
+                )
 
                 counter += 1
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="admin_params"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_params"
+            )
         )
 
         markup.add(
@@ -1962,16 +2315,20 @@ def callback_inline(call):
         if has_blocked:
 
             msg_text = (
-                "🚫 <b>Рӯйхати корбарони блокшуда (Mute):</b>\n\n"
-                "<i>Барои дидани маълумоти пурра ва "
-                "аз блок гирифтан, корбарро интихоб кунед:</i>"
+                "🚫 <b>Рӯйхати корбарони "
+                "блокшуда (Mute):</b>\n\n"
+                "<i>Барои дидани маълумоти пурра "
+                "ва аз блок гирифтан, корбарро "
+                "интихоб кунед:</i>"
             )
 
         else:
 
             msg_text = (
-                "🚫 <b>Рӯйхати корбарони блокшуда (Mute):</b>\n\n"
-                "<i>Дар ҳоли ҳозир ҳеҷ корбари блокшуда нест.</i>"
+                "🚫 <b>Рӯйхати корбарони "
+                "блокшуда (Mute):</b>\n\n"
+                "<i>Дар ҳоли ҳозир ҳеҷ корбари "
+                "блокшуда нест.</i>"
             )
 
         bot.edit_message_text(
@@ -2012,7 +2369,8 @@ def callback_inline(call):
 
             bot.answer_callback_query(
                 call.id,
-                "❌ Ин корбар аллакай аз блок баромадааст ё ёфт нашуд.",
+                "❌ Ин корбар аллакай аз блок "
+                "баромадааст ё ёфт нашуд.",
                 show_alert=True
             )
 
@@ -2062,15 +2420,21 @@ def callback_inline(call):
         )
 
         if g_link:
+
             group_str = (
-                f"<a href='{g_link}'>{g_title}</a>"
+                f"<a href='{g_link}'>"
+                f"{g_title}"
+                f"</a>"
             )
+
         else:
+
             group_str = g_title
 
         user_str = (
             f"<a href='tg://user?id={target_id}'>"
-            f"{u_name}</a> ({u_username})"
+            f"{u_name}</a> "
+            f"({u_username})"
         )
 
         info_text = (
@@ -2082,18 +2446,26 @@ def callback_inline(call):
             f"{start_str} то {until_str}"
         )
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
-        btn_unmute = telebot.types.InlineKeyboardButton(
-            "🔓 Аз блок гирифтан",
-            callback_data=f"admin_unmute_{target_id}"
+        btn_unmute = (
+            telebot.types.InlineKeyboardButton(
+                "🔓 Аз блок гирифтан",
+                callback_data=(
+                    f"admin_unmute_{target_id}"
+                )
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="admin_blocked_users"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_blocked_users"
+            )
         )
 
         markup.add(
@@ -2138,7 +2510,10 @@ def callback_inline(call):
                 "group_title"
             ):
 
-                group_id = int(g_id)
+                group_id = int(
+                    g_id
+                )
+
                 break
 
         if group_id:
@@ -2148,16 +2523,19 @@ def callback_inline(call):
                 bot.restrict_chat_member(
                     group_id,
                     target_id,
-                    permissions=telebot.types.ChatPermissions(
-                        can_send_messages=True,
-                        can_send_media_messages=True,
-                        can_send_polls=True,
-                        can_send_other_messages=True,
-                        can_add_web_page_previews=True
+                    permissions=(
+                        telebot.types.ChatPermissions(
+                            can_send_messages=True,
+                            can_send_media_messages=True,
+                            can_send_polls=True,
+                            can_send_other_messages=True,
+                            can_add_web_page_previews=True
+                        )
                     )
                 )
 
             except Exception as e:
+
                 print(
                     f"Хатогӣ ҳангоми озод кардани "
                     f"корбар: {e}"
@@ -2165,17 +2543,28 @@ def callback_inline(call):
 
         if target_id in user_warnings:
 
-            user_warnings[target_id]["mute_until"] = 0
-            user_warnings[target_id]["mute_start"] = 0
+            user_warnings[target_id][
+                "mute_until"
+            ] = 0
+
+            user_warnings[target_id][
+                "mute_start"
+            ] = 0
 
         bot.answer_callback_query(
             call.id,
-            "✅ Корбар бомуваффақият аз блок гирифта шуд!",
+            "✅ Корбар бомуваффақият "
+            "аз блок гирифта шуд!",
             show_alert=True
         )
 
-        call.data = "admin_blocked_users"
-        callback_inline(call)
+        call.data = (
+            "admin_blocked_users"
+        )
+
+        callback_inline(
+            call
+        )
 
     # ======================================
     # КАЛИМАҲОИ НОҶО
@@ -2183,23 +2572,31 @@ def callback_inline(call):
 
     elif call.data == "admin_bad_words_menu":
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=2
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=2
+            )
         )
 
-        btn_add = telebot.types.InlineKeyboardButton(
-            "➕ Илова кардан",
-            callback_data="admin_add_bad_word"
+        btn_add = (
+            telebot.types.InlineKeyboardButton(
+                "➕ Илова кардан",
+                callback_data="admin_add_bad_word"
+            )
         )
 
-        btn_del = telebot.types.InlineKeyboardButton(
-            "🗑 Нест кардан",
-            callback_data="admin_del_bad_word"
+        btn_del = (
+            telebot.types.InlineKeyboardButton(
+                "🗑 Нест кардан",
+                callback_data="admin_del_bad_word"
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="admin_params"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_params"
+            )
         )
 
         markup.add(
@@ -2213,13 +2610,14 @@ def callback_inline(call):
 
         words_formatted = ", ".join(
             [
-                f"<code>{w}</code>"
+                f"<code>{escape_html(w)}</code>"
                 for w in BAD_WORDS
             ]
         )
 
         text_msg = (
-            f"🤬 <b>Калимаҳои ноҷо ва манъшуда:</b>\n\n"
+            f"🤬 <b>Калимаҳои ноҷо "
+            f"ва манъшуда:</b>\n\n"
             f"{words_formatted}\n\n"
             f"<i>Амалро интихоб кунед:</i>"
         )
@@ -2242,7 +2640,9 @@ def callback_inline(call):
             "action": "wait_add_bad_word"
         }
 
-        markup = telebot.types.InlineKeyboardMarkup()
+        markup = (
+            telebot.types.InlineKeyboardMarkup()
+        )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
@@ -2256,8 +2656,9 @@ def callback_inline(call):
             message_id=call.message.message_id,
             text=(
                 "➕ <b>Калимаи нав нависед:</b>\n\n"
-                "<i>Калимаеро, ки мехоҳед дар гурӯҳҳо "
-                "манъ карда шавад, равон кунед:</i>"
+                "<i>Калимаеро, ки мехоҳед "
+                "дар гурӯҳҳо манъ карда шавад, "
+                "равон кунед:</i>"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -2273,7 +2674,9 @@ def callback_inline(call):
             "action": "wait_del_bad_word"
         }
 
-        markup = telebot.types.InlineKeyboardMarkup()
+        markup = (
+            telebot.types.InlineKeyboardMarkup()
+        )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
@@ -2286,7 +2689,8 @@ def callback_inline(call):
             chat_id=chat_id,
             message_id=call.message.message_id,
             text=(
-                "🗑 <b>Калимаро барои нест кардан нависед:</b>"
+                "🗑 <b>Калимаро барои "
+                "нест кардан нависед:</b>"
             ),
             parse_mode="HTML",
             reply_markup=markup
@@ -2306,13 +2710,17 @@ def callback_inline(call):
             "action": "wait_broadcast"
         }
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="admin_groups"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_groups"
+            )
         )
 
         markup.add(
@@ -2324,7 +2732,8 @@ def callback_inline(call):
             message_id=call.message.message_id,
             text=(
                 "📢 <b>Паёмеро, ки мехоҳед "
-                "ба ҲАМАИ гурӯҳҳо фиристед, равон кунед:</b>\n\n"
+                "ба ҲАМАИ гурӯҳҳо фиристед, "
+                "равон кунед:</b>\n\n"
                 "📝 Матн\n"
                 "🖼 Акс\n"
                 "🎥 Видео\n"
@@ -2360,6 +2769,7 @@ def callback_inline(call):
         kept_count = 0
 
         try:
+
             bot_id = bot.get_me().id
 
         except Exception as e:
@@ -2396,7 +2806,9 @@ def callback_inline(call):
                         int(g_id)
                     )
 
-                    updated_groups[str(g_id)] = (
+                    updated_groups[
+                        str(g_id)
+                    ] = (
                         chat_info.title
                         if chat_info.title
                         else g_name
@@ -2412,7 +2824,9 @@ def callback_inline(call):
             updated_groups
         )
 
-        markup = telebot.types.InlineKeyboardMarkup()
+        markup = (
+            telebot.types.InlineKeyboardMarkup()
+        )
 
         markup.add(
             telebot.types.InlineKeyboardButton(
@@ -2427,13 +2841,15 @@ def callback_inline(call):
             text=(
                 f"🔄 <b>Навсозии гурӯҳҳо "
                 f"ба охир расид!</b>\n\n"
-                f"✅ Гурӯҳҳои фаъол: <b>{kept_count}</b>\n"
+                f"✅ Гурӯҳҳои фаъол: "
+                f"<b>{kept_count}</b>\n"
                 f"❌ Хориҷшуда/Нестшуда: "
                 f"<b>{removed_count}</b>"
             ),
             parse_mode="HTML",
             reply_markup=markup
         )
+
 
     # ======================================
     # ГУРӮҲИ ИНТИХОБШУДА
@@ -2460,18 +2876,26 @@ def callback_inline(call):
             or "Дастрас нест"
         )
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
-        btn_send = telebot.types.InlineKeyboardButton(
-            "✍️ Фиристодани паём",
-            callback_data=f"admin_send_msg_{group_id}"
+        btn_send = (
+            telebot.types.InlineKeyboardButton(
+                "✍️ Фиристодани паём",
+                callback_data=(
+                    f"admin_send_msg_{group_id}"
+                )
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data="admin_groups"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data="admin_groups"
+            )
         )
 
         markup.add(
@@ -2522,13 +2946,19 @@ def callback_inline(call):
             "group_id": group_id
         }
 
-        markup = telebot.types.InlineKeyboardMarkup(
-            row_width=1
+        markup = (
+            telebot.types.InlineKeyboardMarkup(
+                row_width=1
+            )
         )
 
-        btn_cancel = telebot.types.InlineKeyboardButton(
-            "❌ Бекор кардан",
-            callback_data=f"admin_view_group_{group_id}"
+        btn_cancel = (
+            telebot.types.InlineKeyboardButton(
+                "❌ Бекор кардан",
+                callback_data=(
+                    f"admin_view_group_{group_id}"
+                )
+            )
         )
 
         markup.add(
@@ -2562,6 +2992,7 @@ def callback_inline(call):
 def welcome_new_member(message):
 
     chat_id = message.chat.id
+
     chat_title = message.chat.title
 
     groups = load_groups()
@@ -2572,7 +3003,9 @@ def welcome_new_member(message):
 
     if is_new_group:
 
-        groups[str(chat_id)] = chat_title
+        groups[str(chat_id)] = (
+            chat_title
+        )
 
         save_groups(
             groups
@@ -2649,9 +3082,11 @@ def delete_left_member_message(message):
 def get_message_text(message):
 
     if message.text:
+
         return message.text.lower()
 
     elif message.caption:
+
         return message.caption.lower()
 
     return ""
@@ -2730,43 +3165,58 @@ def save_private_message(
         message
     )
 
-    str_u_id = str(user_id)
+    str_u_id = str(
+        user_id
+    )
 
     if str_u_id not in PM_DATA:
 
         PM_DATA[str_u_id] = {
+
             "user_id": user_id,
+
             "name": (
                 message.from_user.first_name
                 if message.from_user
                 and message.from_user.first_name
                 else "Корбар"
             ),
+
             "username": (
                 f"@{message.from_user.username}"
                 if message.from_user
                 and message.from_user.username
                 else "Никнейм надорад"
             ),
+
             "messages": [],
+
             "last_updated": time.time()
         }
 
     message_data = {
+
         "sender": sender,
+
         "type": info["type"],
+
         "text": info["text"],
+
         "time": time.time()
     }
 
-    PM_DATA[str_u_id].setdefault(
+    PM_DATA[
+        str_u_id
+    ].setdefault(
         "messages",
         []
     ).append(
         message_data
     )
 
-    PM_DATA[str_u_id]["last_updated"] = (
+    PM_DATA[
+        str_u_id
+    ]["last_updated"] = (
         time.time()
     )
 
@@ -2782,18 +3232,23 @@ def send_private_message_to_admin(
     user_username
 ):
 
-    markup = telebot.types.InlineKeyboardMarkup()
+    markup = (
+        telebot.types.InlineKeyboardMarkup()
+    )
 
     markup.add(
         telebot.types.InlineKeyboardButton(
             "💬 Ҷавоб додан",
-            callback_data=f"admin_view_pm_{user_id}"
+            callback_data=(
+                f"admin_view_pm_{user_id}"
+            )
         )
     )
 
     header = (
         f"📩 <b>Паёми нав дар ЛС!</b>\n\n"
-        f"👤 Корбар: <b>{escape_html(user_name)}</b>\n"
+        f"👤 Корбар: "
+        f"<b>{escape_html(user_name)}</b>\n"
         f"🏷 Никнейм: "
         f"{escape_html(user_username)}\n"
         f"🆔 ID: <code>{user_id}</code>\n"
@@ -2801,10 +3256,15 @@ def send_private_message_to_admin(
 
     try:
 
+        # ==================================
         # TEXT
+        # ==================================
+
         if message.content_type == "text":
 
-            msg_text = message.text or ""
+            msg_text = (
+                message.text or ""
+            )
 
             notify_text = (
                 f"{header}"
@@ -2819,10 +3279,15 @@ def send_private_message_to_admin(
                 reply_markup=markup
             )
 
+        # ==================================
         # PHOTO
+        # ==================================
+
         elif message.content_type == "photo":
 
-            caption = message.caption or ""
+            caption = (
+                message.caption or ""
+            )
 
             notify_text = (
                 f"{header}"
@@ -2830,6 +3295,7 @@ def send_private_message_to_admin(
             )
 
             if caption:
+
                 notify_text += (
                     f"\n📝 Caption: "
                     f"<i>{escape_html(caption)}</i>"
@@ -2843,10 +3309,15 @@ def send_private_message_to_admin(
                 reply_markup=markup
             )
 
+        # ==================================
         # VIDEO
+        # ==================================
+
         elif message.content_type == "video":
 
-            caption = message.caption or ""
+            caption = (
+                message.caption or ""
+            )
 
             notify_text = (
                 f"{header}"
@@ -2854,6 +3325,7 @@ def send_private_message_to_admin(
             )
 
             if caption:
+
                 notify_text += (
                     f"\n📝 Caption: "
                     f"<i>{escape_html(caption)}</i>"
@@ -2867,10 +3339,15 @@ def send_private_message_to_admin(
                 reply_markup=markup
             )
 
+        # ==================================
         # DOCUMENT
+        # ==================================
+
         elif message.content_type == "document":
 
-            caption = message.caption or ""
+            caption = (
+                message.caption or ""
+            )
 
             notify_text = (
                 f"{header}"
@@ -2878,6 +3355,7 @@ def send_private_message_to_admin(
             )
 
             if caption:
+
                 notify_text += (
                     f"\n📝 Caption: "
                     f"<i>{escape_html(caption)}</i>"
@@ -2891,10 +3369,15 @@ def send_private_message_to_admin(
                 reply_markup=markup
             )
 
+        # ==================================
         # AUDIO
+        # ==================================
+
         elif message.content_type == "audio":
 
-            caption = message.caption or ""
+            caption = (
+                message.caption or ""
+            )
 
             notify_text = (
                 f"{header}"
@@ -2902,6 +3385,7 @@ def send_private_message_to_admin(
             )
 
             if caption:
+
                 notify_text += (
                     f"\n📝 Caption: "
                     f"<i>{escape_html(caption)}</i>"
@@ -2915,7 +3399,10 @@ def send_private_message_to_admin(
                 reply_markup=markup
             )
 
+        # ==================================
         # VOICE
+        # ==================================
+
         elif message.content_type == "voice":
 
             notify_text = (
@@ -2931,7 +3418,10 @@ def send_private_message_to_admin(
                 reply_markup=markup
             )
 
+        # ==================================
         # STICKER
+        # ==================================
+
         elif message.content_type == "sticker":
 
             bot.send_message(
@@ -3031,7 +3521,8 @@ def send_admin_message_to_user(
     else:
 
         raise ValueError(
-            "Ин навъи файл дар системаи ЛС дастгирӣ намешавад."
+            "Ин навъи файл дар системаи "
+            "ЛС дастгирӣ намешавад."
         )
 
 
@@ -3061,7 +3552,10 @@ def chat(message):
     global QA_DATA
 
     if not BOT_USERNAME:
-        BOT_USERNAME = bot.get_me().username
+
+        BOT_USERNAME = (
+            bot.get_me().username
+        )
 
     chat_id = str(
         message.chat.id
@@ -3078,7 +3572,9 @@ def chat(message):
         or "Гурӯҳ"
     )
 
-    sender_chat = message.sender_chat
+    sender_chat = (
+        message.sender_chat
+    )
 
     if message.from_user:
 
@@ -3097,6 +3593,7 @@ def chat(message):
     else:
 
         user_name = "Канал / Чат"
+
         user_username = "Аноним"
 
     # ======================================
@@ -3113,8 +3610,10 @@ def chat(message):
 
             if user_id in admin_states:
 
-                action = admin_states[user_id].get(
-                    "action"
+                action = (
+                    admin_states[user_id].get(
+                        "action"
+                    )
                 )
 
                 # ==========================
@@ -3123,9 +3622,11 @@ def chat(message):
 
                 if action == "reply_to_pm":
 
-                    target_id = admin_states[user_id][
-                        "target_id"
-                    ]
+                    target_id = (
+                        admin_states[user_id][
+                            "target_id"
+                        ]
+                    )
 
                     try:
 
@@ -3177,12 +3678,15 @@ def chat(message):
                     )
 
                     success_count = 0
+
                     fail_count = 0
 
                     bot.send_message(
                         chat_id,
-                        "⏳ Раванди фиристодани паём "
-                        "ба ҳамаи корбарон оғоз шуд..."
+                        (
+                            "⏳ Раванди фиристодани паём "
+                            "ба ҳамаи корбарон оғоз шуд..."
+                        )
                     )
 
                     for u_id in list(
@@ -3202,15 +3706,20 @@ def chat(message):
                                 0.05
                             )
 
-                        except:
+                        except Exception as e:
+
+                            print(
+                                f"Хатогӣ ҳангоми "
+                                f"рассылка ба {u_id}: {e}"
+                            )
 
                             fail_count += 1
 
                     bot.send_message(
                         chat_id,
                         (
-                            f"📢 <b>Рассылка ба корбарон "
-                            f"ба охир расид!</b>\n\n"
+                            f"📢 <b>Рассылка ба "
+                            f"корбарон ба охир расид!</b>\n\n"
                             f"✅ Муваффақона: "
                             f"<b>{success_count}</b>\n"
                             f"❌ Хатогӣ: "
@@ -3231,7 +3740,10 @@ def chat(message):
 
                         bot.send_message(
                             chat_id,
-                            "⚠️ Лутфан саволро ҳамчун матн нависед."
+                            (
+                                "⚠️ Лутфан саволро "
+                                "ҳамчун матн нависед."
+                            )
                         )
 
                         return
@@ -3254,6 +3766,17 @@ def chat(message):
                         "question": q_text
                     }
 
+                    markup = (
+                        telebot.types.InlineKeyboardMarkup()
+                    )
+
+                    markup.add(
+                        telebot.types.InlineKeyboardButton(
+                            "❌ Бекор кардан",
+                            callback_data="admin_qa_menu"
+                        )
+                    )
+
                     bot.send_message(
                         chat_id,
                         (
@@ -3261,7 +3784,8 @@ def chat(message):
                             f"«<b>{escape_html(q_text)}</b>»\n\n"
                             f"💬 Акнун <b>ҶАВОБ</b>-ро равон кунед:"
                         ),
-                        parse_mode="HTML"
+                        parse_mode="HTML",
+                        reply_markup=markup
                     )
 
                     return
@@ -3276,7 +3800,10 @@ def chat(message):
 
                         bot.send_message(
                             chat_id,
-                            "⚠️ Лутфан ҷавобро ҳамчун матн нависед."
+                            (
+                                "⚠️ Лутфан ҷавобро "
+                                "ҳамчун матн нависед."
+                            )
                         )
 
                         return
@@ -3294,9 +3821,11 @@ def chat(message):
 
                         return
 
-                    q_text = admin_states[user_id][
-                        "question"
-                    ]
+                    q_text = (
+                        admin_states[user_id][
+                            "question"
+                        ]
+                    )
 
                     admin_states[user_id] = {
                         "action": "wait_qa_limit",
@@ -3304,17 +3833,29 @@ def chat(message):
                         "answer": a_text
                     }
 
+                    markup = (
+                        telebot.types.InlineKeyboardMarkup()
+                    )
+
+                    markup.add(
+                        telebot.types.InlineKeyboardButton(
+                            "❌ Бекор кардан",
+                            callback_data="admin_qa_menu"
+                        )
+                    )
+
                     bot.send_message(
                         chat_id,
                         (
                             f"✅ Ҷавоб қабул шуд: "
                             f"«<b>{escape_html(a_text)}</b>»\n\n"
-                            f"🔢 Акнун рақамеро нависед, "
+                            f"🔢 Акнун РАҚАМ нависед, "
                             f"ки ин саволу ҷавоб "
-                            f"<b>ЧАНД БОР</b> истифода шавад:\n\n"
+                            f"<b>чанд бор</b> истифода шавад:\n\n"
                             f"<i>Мисол: 10</i>"
                         ),
-                        parse_mode="HTML"
+                        parse_mode="HTML",
+                        reply_markup=markup
                     )
 
                     return
@@ -3325,6 +3866,18 @@ def chat(message):
 
                 elif action == "wait_qa_limit":
 
+                    if message.content_type != "text":
+
+                        bot.send_message(
+                            chat_id,
+                            (
+                                "⚠️ Лутфан танҳо "
+                                "рақам нависед."
+                            )
+                        )
+
+                        return
+
                     try:
 
                         limit_count = int(
@@ -3332,27 +3885,77 @@ def chat(message):
                         )
 
                         if limit_count < 1:
+
                             raise ValueError
 
-                        q_text = admin_states[user_id][
-                            "question"
-                        ]
+                        q_text = (
+                            admin_states[user_id][
+                                "question"
+                            ]
+                        )
 
-                        a_text = admin_states[user_id][
-                            "answer"
-                        ]
+                        a_text = (
+                            admin_states[user_id][
+                                "answer"
+                            ]
+                        )
 
                         # ==================================
                         # САВОЛУ ҶАВОБ ДАР БАЗАИ АЛОҲИДА
                         # ==================================
 
-                        QA_DATA.append({
-                            "question": q_text,
-                            "answer": a_text,
-                            "time": time.time(),
-                            "use_count": 0,
-                            "max_uses": limit_count
-                        })
+                        normalized_question = (
+                            normalize_qa_text(
+                                q_text
+                            )
+                        )
+
+                        existing_item = None
+
+                        for old_item in QA_DATA:
+
+                            if (
+                                normalize_qa_text(
+                                    old_item.get(
+                                        "question",
+                                        ""
+                                    )
+                                )
+                                == normalized_question
+                            ):
+
+                                existing_item = old_item
+                                break
+
+                        if existing_item:
+
+                            existing_item["question"] = (
+                                q_text
+                            )
+
+                            existing_item["answer"] = (
+                                a_text
+                            )
+
+                            existing_item["time"] = (
+                                time.time()
+                            )
+
+                            existing_item["use_count"] = 0
+
+                            existing_item["max_uses"] = (
+                                limit_count
+                            )
+
+                        else:
+
+                            QA_DATA.append({
+                                "question": q_text,
+                                "answer": a_text,
+                                "time": time.time(),
+                                "use_count": 0,
+                                "max_uses": limit_count
+                            })
 
                         save_qa()
 
@@ -3360,12 +3963,14 @@ def chat(message):
                             user_id
                         )
 
-                        markup = telebot.types.InlineKeyboardMarkup()
+                        markup = (
+                            telebot.types.InlineKeyboardMarkup()
+                        )
 
                         markup.add(
                             telebot.types.InlineKeyboardButton(
-                                "⚡ Ба менюи Худомӯзӣ",
-                                callback_data="admin_hudomez_menu"
+                                "💬 Ба Саволу ҷавоб",
+                                callback_data="admin_qa_menu"
                             )
                         )
 
@@ -3373,7 +3978,7 @@ def chat(message):
                             chat_id,
                             (
                                 f"🎉 <b>Саволу ҷавоб "
-                                f"муваффақона илова шуд!</b>\n\n"
+                                f"муваффақона сабт шуд!</b>\n\n"
                                 f"❓ Савол: "
                                 f"<code>{escape_html(q_text)}</code>\n"
                                 f"💬 Ҷавоб: "
@@ -3405,6 +4010,18 @@ def chat(message):
 
                 elif action == "wait_match_limit":
 
+                    if message.content_type != "text":
+
+                        bot.send_message(
+                            chat_id,
+                            (
+                                "⚠️ Лутфан танҳо рақам "
+                                "нависед."
+                            )
+                        )
+
+                        return
+
                     try:
 
                         match_val = int(
@@ -3412,6 +4029,7 @@ def chat(message):
                         )
 
                         if match_val < 1:
+
                             match_val = 1
 
                         SETTINGS[
@@ -3426,11 +4044,13 @@ def chat(message):
                             user_id
                         )
 
-                        markup = telebot.types.InlineKeyboardMarkup()
+                        markup = (
+                            telebot.types.InlineKeyboardMarkup()
+                        )
 
                         markup.add(
                             telebot.types.InlineKeyboardButton(
-                                "⚡ Ба менюи Худомӯзӣ",
+                                "⚡ Ба Худомӯзӣ",
                                 callback_data="admin_hudomez_menu"
                             )
                         )
@@ -3439,10 +4059,10 @@ def chat(message):
                             chat_id,
                             (
                                 f"✅ Танзимот қабул шуд!\n\n"
-                                f"Акнун бот танҳо ҳангоми "
-                                f"пайдо шудани камаш "
-                                f"<b>{match_val}</b> калимаи мувофиқ "
-                                f"дар паём ҷавоб медиҳад."
+                                f"Акнун бот ҳангоми "
+                                f"мувофиқати камаш "
+                                f"<b>{match_val}</b> калима "
+                                f"ҷавоб медиҳад."
                             ),
                             parse_mode="HTML",
                             reply_markup=markup
@@ -3453,8 +4073,8 @@ def chat(message):
                         bot.send_message(
                             chat_id,
                             (
-                                "⚠️ Лутфан танҳо РАҚАМ нависед "
-                                "(масалан: 1, 2 ё 3):"
+                                "⚠️ Лутфан танҳо РАҚАМ "
+                                "нависед."
                             )
                         )
 
@@ -3465,6 +4085,15 @@ def chat(message):
                 # ==========================
 
                 elif action == "wait_add_bad_word":
+
+                    if message.content_type != "text":
+
+                        bot.send_message(
+                            chat_id,
+                            "⚠️ Лутфан калимаро ҳамчун матн нависед."
+                        )
+
+                        return
 
                     new_word = (
                         message.text.strip().lower()
@@ -3512,6 +4141,15 @@ def chat(message):
 
                 elif action == "wait_del_bad_word":
 
+                    if message.content_type != "text":
+
+                        bot.send_message(
+                            chat_id,
+                            "⚠️ Лутфан калимаро ҳамчун матн нависед."
+                        )
+
+                        return
+
                     word_to_del = (
                         message.text.strip().lower()
                     )
@@ -3555,9 +4193,11 @@ def chat(message):
 
                 elif action == "wait_message":
 
-                    group_id = admin_states[user_id][
-                        "group_id"
-                    ]
+                    group_id = (
+                        admin_states[user_id][
+                            "group_id"
+                        ]
+                    )
 
                     groups = load_groups()
 
@@ -3568,16 +4208,57 @@ def chat(message):
 
                     try:
 
-                        bot.send_message(
-                            group_id,
-                            message.text
-                        )
+                        if message.content_type == "text":
+
+                            bot.send_message(
+                                group_id,
+                                message.text
+                            )
+
+                        elif message.content_type == "photo":
+
+                            bot.send_photo(
+                                group_id,
+                                message.photo[-1].file_id,
+                                caption=message.caption or ""
+                            )
+
+                        elif message.content_type == "video":
+
+                            bot.send_video(
+                                group_id,
+                                message.video.file_id,
+                                caption=message.caption or ""
+                            )
+
+                        elif message.content_type == "document":
+
+                            bot.send_document(
+                                group_id,
+                                message.document.file_id,
+                                caption=message.caption or ""
+                            )
+
+                        elif message.content_type == "sticker":
+
+                            bot.send_sticker(
+                                group_id,
+                                message.sticker.file_id
+                            )
+
+                        else:
+
+                            raise ValueError(
+                                "Ин навъи паём дастгирӣ намешавад."
+                            )
 
                         admin_states.pop(
                             user_id
                         )
 
-                        markup = telebot.types.InlineKeyboardMarkup()
+                        markup = (
+                            telebot.types.InlineKeyboardMarkup()
+                        )
 
                         markup.add(
                             telebot.types.InlineKeyboardButton(
@@ -3589,8 +4270,7 @@ def chat(message):
                         bot.send_message(
                             chat_id,
                             (
-                                f"✅ Паёми шумо бомуваффақият "
-                                f"ба гурӯҳи "
+                                f"✅ Паём ба гурӯҳи "
                                 f"«<b>{escape_html(group_name)}</b>» "
                                 f"фиристода шуд!"
                             ),
@@ -3611,7 +4291,7 @@ def chat(message):
                     return
 
                 # ==========================
-                # РАССЫЛКА БА ГУРӮҲҲО
+                # РАССЫЛКА БА ҲАМАИ ГУРӮҲҲО
                 # ==========================
 
                 elif action == "wait_broadcast":
@@ -3632,6 +4312,7 @@ def chat(message):
                         return
 
                     success_count = 0
+
                     fail_count = 0
 
                     bot.send_message(
@@ -3645,13 +4326,14 @@ def chat(message):
                     # ==================================
                     # COPY MESSAGE
                     #
-                    # Бо copy_message:
                     # TEXT
                     # PHOTO
                     # VIDEO
                     # DOCUMENT
                     # STICKER
-                    # ва дигар media-ҳо фиристода мешаванд.
+                    # AUDIO
+                    # VOICE
+                    # ва дигар media-ҳо
                     # ==================================
 
                     for g_id in list(
@@ -3662,7 +4344,7 @@ def chat(message):
 
                             bot.copy_message(
                                 chat_id=int(g_id),
-                                from_chat_id=chat_id,
+                                from_chat_id=message.chat.id,
                                 message_id=message.message_id
                             )
 
@@ -3681,7 +4363,9 @@ def chat(message):
 
                             fail_count += 1
 
-                    markup = telebot.types.InlineKeyboardMarkup()
+                    markup = (
+                        telebot.types.InlineKeyboardMarkup()
+                    )
 
                     markup.add(
                         telebot.types.InlineKeyboardButton(
@@ -3720,30 +4404,47 @@ def chat(message):
             if str_u_id not in PM_DATA:
 
                 PM_DATA[str_u_id] = {
+
                     "user_id": user_id,
+
                     "name": user_name,
+
                     "username": user_username,
+
                     "first_name": (
                         message.from_user.first_name
                         or ""
                     ),
+
                     "last_name": (
                         message.from_user.last_name
                         or ""
                     ),
+
                     "messages": [],
+
                     "last_updated": time.time()
                 }
 
             else:
 
-                PM_DATA[str_u_id]["user_id"] = user_id
-                PM_DATA[str_u_id]["name"] = user_name
-                PM_DATA[str_u_id]["username"] = user_username
+                PM_DATA[str_u_id]["user_id"] = (
+                    user_id
+                )
+
+                PM_DATA[str_u_id]["name"] = (
+                    user_name
+                )
+
+                PM_DATA[str_u_id]["username"] = (
+                    user_username
+                )
+
                 PM_DATA[str_u_id]["first_name"] = (
                     message.from_user.first_name
                     or ""
                 )
+
                 PM_DATA[str_u_id]["last_name"] = (
                     message.from_user.last_name
                     or ""
@@ -3777,7 +4478,9 @@ def chat(message):
 
         if chat_id not in groups:
 
-            groups[chat_id] = chat_title
+            groups[chat_id] = (
+                chat_title
+            )
 
             save_groups(
                 groups
@@ -3798,15 +4501,23 @@ def chat(message):
         if user_id not in user_warnings:
 
             user_warnings[user_id] = {
+
                 "bad_words": 0,
+
                 "spam": 0,
+
                 "name": user_name,
+
                 "username": user_username,
+
                 "group_title": chat_title,
+
                 "group_link": get_group_link(
                     message.chat.id
                 ),
+
                 "mute_start": 0,
+
                 "mute_until": 0
             }
 
@@ -3831,6 +4542,7 @@ def chat(message):
                 return
 
             except:
+
                 pass
 
         # ==================================
@@ -3841,121 +4553,116 @@ def chat(message):
             msg_text
         ):
 
-            if message.chat.type in [
-                'group',
-                'supergroup'
-            ]:
+            try:
 
-                try:
+                bot.delete_message(
+                    message.chat.id,
+                    message.message_id
+                )
 
-                    bot.delete_message(
+                user_warnings[user_id][
+                    "bad_words"
+                ] += 1
+
+                warnings_count = (
+                    user_warnings[user_id][
+                        "bad_words"
+                    ]
+                )
+
+                owner_alert = (
+                    f"🤬 <b>Сухани Ноҷо "
+                    f"Ошкор Шуд!</b>\n\n"
+                    f"👤 Корбар: "
+                    f"{escape_html(user_name)} "
+                    f"({escape_html(user_username)})\n"
+                    f"🆔 ID: "
+                    f"<code>{user_id}</code>\n"
+                    f"👥 Гурӯҳ: "
+                    f"{escape_html(chat_title)}\n"
+                    f"💬 Навишт: "
+                    f"<code>{escape_html(msg_text)}</code>\n"
+                    f"⚠️ Огоҳӣ: "
+                    f"{warnings_count}/3"
+                )
+
+                send_to_owner(
+                    owner_alert
+                )
+
+                add_btn_markup = (
+                    get_add_to_group_keyboard()
+                )
+
+                if warnings_count < 3:
+
+                    bot.send_message(
                         message.chat.id,
-                        message.message_id
+                        (
+                            f"⚠️ {user_name}, "
+                            f"навиштани калимаҳои ноҷо "
+                            f"ва дашном қатъиян манъ аст!\n"
+                            f"Огоҳӣ: "
+                            f"({warnings_count}/3)"
+                        ),
+                        reply_markup=add_btn_markup
+                    )
+
+                else:
+
+                    restrict_user(
+                        message.chat.id,
+                        user_id,
+                        8
+                    )
+
+                    now_ts = time.time()
+
+                    until_ts = (
+                        now_ts
+                        + (8 * 3600)
+                    )
+
+                    user_warnings[user_id][
+                        "mute_start"
+                    ] = now_ts
+
+                    user_warnings[user_id][
+                        "mute_until"
+                    ] = until_ts
+
+                    bot.send_message(
+                        message.chat.id,
+                        (
+                            f"🚫 {user_name} "
+                            f"барои истифодаи мунтазами "
+                            f"калимаҳои ноҷо ба муҳлати "
+                            f"<b>8 соат</b> бесадо (Mute) "
+                            f"карда шуд!"
+                        ),
+                        parse_mode="HTML",
+                        reply_markup=add_btn_markup
+                    )
+
+                    send_to_owner(
+                        (
+                            f"🚫 Корбар "
+                            f"{escape_html(user_name)} "
+                            f"(<code>{user_id}</code>) "
+                            f"ба муҳлати <b>8 соат "
+                            f"бан (Mute)</b> шуд!"
+                        )
                     )
 
                     user_warnings[user_id][
                         "bad_words"
-                    ] += 1
+                    ] = 0
 
-                    warnings_count = (
-                        user_warnings[user_id][
-                            "bad_words"
-                        ]
-                    )
+            except Exception as e:
 
-                    owner_alert = (
-                        f"🤬 <b>Сухани Ноҷо "
-                        f"Ошкор Шуд!</b>\n\n"
-                        f"👤 Корбар: "
-                        f"{escape_html(user_name)} "
-                        f"({escape_html(user_username)})\n"
-                        f"🆔 ID: "
-                        f"<code>{user_id}</code>\n"
-                        f"👥 Гурӯҳ: "
-                        f"{escape_html(chat_title)}\n"
-                        f"💬 Навишт: "
-                        f"<code>{escape_html(msg_text)}</code>\n"
-                        f"⚠️ Огоҳӣ: "
-                        f"{warnings_count}/3"
-                    )
-
-                    send_to_owner(
-                        owner_alert
-                    )
-
-                    add_btn_markup = (
-                        get_add_to_group_keyboard()
-                    )
-
-                    if warnings_count < 3:
-
-                        bot.send_message(
-                            message.chat.id,
-                            (
-                                f"⚠️ {user_name}, "
-                                f"навиштани калимаҳои ноҷо "
-                                f"ва дашном қатъиян манъ аст!\n"
-                                f"Огоҳӣ: "
-                                f"({warnings_count}/3)"
-                            ),
-                            reply_markup=add_btn_markup
-                        )
-
-                    else:
-
-                        restrict_user(
-                            message.chat.id,
-                            user_id,
-                            8
-                        )
-
-                        now_ts = time.time()
-
-                        until_ts = (
-                            now_ts
-                            + (8 * 3600)
-                        )
-
-                        user_warnings[user_id][
-                            "mute_start"
-                        ] = now_ts
-
-                        user_warnings[user_id][
-                            "mute_until"
-                        ] = until_ts
-
-                        bot.send_message(
-                            message.chat.id,
-                            (
-                                f"🚫 {user_name} "
-                                f"барои истифодаи мунтазами "
-                                f"калимаҳои ноҷо ба муҳлати "
-                                f"<b>8 соат</b> бесадо (Mute) "
-                                f"карда шуд!"
-                            ),
-                            parse_mode="HTML",
-                            reply_markup=add_btn_markup
-                        )
-
-                        send_to_owner(
-                            (
-                                f"🚫 Корбар "
-                                f"{escape_html(user_name)} "
-                                f"(<code>{user_id}</code>) "
-                                f"ба муҳлати <b>8 соат "
-                                f"бан (Mute)</b> шуд!"
-                            )
-                        )
-
-                        user_warnings[user_id][
-                            "bad_words"
-                        ] = 0
-
-                except Exception as e:
-
-                    print(
-                        f"❌ Хатогӣ: {e}"
-                    )
+                print(
+                    f"❌ Хатогӣ: {e}"
+                )
 
             return
 
@@ -3975,133 +4682,143 @@ def chat(message):
             or is_forwarded
         ):
 
-            if message.chat.type in [
-                'group',
-                'supergroup'
-            ]:
+            try:
 
-                try:
+                bot.delete_message(
+                    message.chat.id,
+                    message.message_id
+                )
 
-                    bot.delete_message(
+                user_warnings[user_id][
+                    "spam"
+                ] += 1
+
+                warnings_count = (
+                    user_warnings[user_id][
+                        "spam"
+                    ]
+                )
+
+                reason = (
+                    "переслать (forward)"
+                    if is_forwarded
+                    else "ссылка/никнейм"
+                )
+
+                owner_alert = (
+                    f"📢 <b>Реклама / Спам "
+                    f"Ошкор Шуд!</b>\n\n"
+                    f"👤 Корбар: "
+                    f"{escape_html(user_name)} "
+                    f"({escape_html(user_username)})\n"
+                    f"🆔 ID: "
+                    f"<code>{user_id}</code>\n"
+                    f"👥 Гурӯҳ: "
+                    f"{escape_html(chat_title)}\n"
+                    f"📂 Навъ: {reason}\n"
+                    f"💬 Навишт: "
+                    f"<code>{escape_html(msg_text)}</code>\n"
+                    f"⚠️ Огоҳӣ: "
+                    f"{warnings_count}/3"
+                )
+
+                send_to_owner(
+                    owner_alert
+                )
+
+                add_btn_markup = (
+                    get_add_to_group_keyboard()
+                )
+
+                if warnings_count < 3:
+
+                    bot.send_message(
                         message.chat.id,
-                        message.message_id
+                        (
+                            f"⚠️ {user_name}, "
+                            f"фиристодани {reason} "
+                            f"реклама ҳисоб шуда, манъ аст!\n"
+                            f"Огоҳӣ: "
+                            f"({warnings_count}/3)"
+                        ),
+                        reply_markup=add_btn_markup
+                    )
+
+                else:
+
+                    restrict_user(
+                        message.chat.id,
+                        user_id,
+                        24
+                    )
+
+                    now_ts = time.time()
+
+                    until_ts = (
+                        now_ts
+                        + (24 * 3600)
+                    )
+
+                    user_warnings[user_id][
+                        "mute_start"
+                    ] = now_ts
+
+                    user_warnings[user_id][
+                        "mute_until"
+                    ] = until_ts
+
+                    bot.send_message(
+                        message.chat.id,
+                        (
+                            f"🚫 {user_name} "
+                            f"барои паҳн кардани "
+                            f"реклама ва спам ба муҳлати "
+                            f"<b>24 соат</b> бесадо "
+                            f"(Mute) карда шуд!"
+                        ),
+                        parse_mode="HTML",
+                        reply_markup=add_btn_markup
+                    )
+
+                    send_to_owner(
+                        (
+                            f"🚫 Корбар "
+                            f"{escape_html(user_name)} "
+                            f"(<code>{user_id}</code>) "
+                            f"ба муҳлати <b>24 соат "
+                            f"бан (Mute)</b> шуд!"
+                        )
                     )
 
                     user_warnings[user_id][
                         "spam"
-                    ] += 1
+                    ] = 0
 
-                    warnings_count = (
-                        user_warnings[user_id][
-                            "spam"
-                        ]
-                    )
+            except Exception as e:
 
-                    reason = (
-                        "переслать (forward)"
-                        if is_forwarded
-                        else "ссылка/никнейм"
-                    )
-
-                    owner_alert = (
-                        f"📢 <b>Реклама / Спам "
-                        f"Ошкор Шуд!</b>\n\n"
-                        f"👤 Корбар: "
-                        f"{escape_html(user_name)} "
-                        f"({escape_html(user_username)})\n"
-                        f"🆔 ID: "
-                        f"<code>{user_id}</code>\n"
-                        f"👥 Гурӯҳ: "
-                        f"{escape_html(chat_title)}\n"
-                        f"📂 Навъ: {reason}\n"
-                        f"💬 Навишт: "
-                        f"<code>{escape_html(msg_text)}</code>\n"
-                        f"⚠️ Огоҳӣ: "
-                        f"{warnings_count}/3"
-                    )
-
-                    send_to_owner(
-                        owner_alert
-                    )
-
-                    add_btn_markup = (
-                        get_add_to_group_keyboard()
-                    )
-
-                    if warnings_count < 3:
-
-                        bot.send_message(
-                            message.chat.id,
-                            (
-                                f"⚠️ {user_name}, "
-                                f"фиристодани {reason} "
-                                f"реклама ҳисоб шуда, манъ аст!\n"
-                                f"Огоҳӣ: "
-                                f"({warnings_count}/3)"
-                            ),
-                            reply_markup=add_btn_markup
-                        )
-
-                    else:
-
-                        restrict_user(
-                            message.chat.id,
-                            user_id,
-                            24
-                        )
-
-                        now_ts = time.time()
-
-                        until_ts = (
-                            now_ts
-                            + (24 * 3600)
-                        )
-
-                        user_warnings[user_id][
-                            "mute_start"
-                        ] = now_ts
-
-                        user_warnings[user_id][
-                            "mute_until"
-                        ] = until_ts
-
-                        bot.send_message(
-                            message.chat.id,
-                            (
-                                f"🚫 {user_name} "
-                                f"барои паҳн кардани "
-                                f"реклама ва спам ба муҳлати "
-                                f"<b>24 соат</b> бесадо "
-                                f"(Mute) карда шуд!"
-                            ),
-                            parse_mode="HTML",
-                            reply_markup=add_btn_markup
-                        )
-
-                        send_to_owner(
-                            (
-                                f"🚫 Корбар "
-                                f"{escape_html(user_name)} "
-                                f"(<code>{user_id}</code>) "
-                                f"ба муҳлати <b>24 соат "
-                                f"бан (Mute)</b> шуд!"
-                            )
-                        )
-
-                        user_warnings[user_id][
-                            "spam"
-                        ] = 0
-
-                except Exception as e:
-
-                    print(
-                        f"❌ Хатогӣ: {e}"
-                    )
+                print(
+                    f"❌ Хатогӣ: {e}"
+                )
 
             return
 
     # ==========================================
     # САВОЛУ ҶАВОБИ ДАСТӢ
+    #
+    # ИН СИСТЕМА АЗ ANSWERS ҶУДО АСТ.
+    #
+    # Мисол:
+    # Савол: салом
+    # Ҷавоб: воалейкум салом
+    # Лимит: 10
+    #
+    # Паём:
+    # "салом бародар"
+    #
+    # Бот ҷавоб медиҳад.
+    #
+    # Пас аз 10 истифода:
+    # ин саволу ҷавоб аз QA_DATA нест мешавад.
     # ==========================================
 
     if (
@@ -4111,13 +4828,14 @@ def chat(message):
         ]
     ):
 
-        # Танҳо text/caption барои ҷустуҷӯи Q&A
         qa_text = ""
 
         if message.text:
+
             qa_text = message.text
 
         elif message.caption:
+
             qa_text = message.caption
 
         if qa_text:
@@ -4147,7 +4865,7 @@ def chat(message):
                     max_allowed = (
                         matched_qa.get(
                             "max_uses",
-                            2
+                            10
                         )
                     )
 
@@ -4157,10 +4875,13 @@ def chat(message):
                     ):
 
                         try:
+
                             QA_DATA.remove(
                                 matched_qa
                             )
+
                         except:
+
                             pass
 
                     save_qa()
@@ -4174,7 +4895,9 @@ def chat(message):
                     )
 
     # ==========================================
-    # АВТО-ОМӮЗИШ ВА ҶАВОБДИҲӢ
+    # АВТО-ОМӮЗИШ ВА ҶАВОБДИҲИИ КУҲНА
+    #
+    # ИН ҚИСМ АЗ QA_DATA ҶУДО АСТ.
     # ==========================================
 
     if (
@@ -4217,31 +4940,55 @@ def chat(message):
             if (
                 len(savol) > 1
                 and javob
-                and not has_bad_words(javob)
-                and not has_link(javob)
+                and not has_bad_words(
+                    javob
+                )
+                and not has_link(
+                    javob
+                )
             ):
 
                 global_key = "GLOBAL"
 
                 if global_key not in ANSWERS:
-                    ANSWERS[global_key] = {}
 
-                if savol not in ANSWERS[global_key]:
-                    ANSWERS[global_key][savol] = []
+                    ANSWERS[
+                        global_key
+                    ] = {}
+
+                if savol not in ANSWERS[
+                    global_key
+                ]:
+
+                    ANSWERS[
+                        global_key
+                    ][savol] = []
 
                 existing_texts = [
                     item["text"]
                     for item
-                    in ANSWERS[global_key][savol]
-                    if isinstance(item, dict)
+                    in ANSWERS[
+                        global_key
+                    ][savol]
+                    if isinstance(
+                        item,
+                        dict
+                    )
+                    and "text" in item
                 ]
 
                 if javob not in existing_texts:
 
-                    ANSWERS[global_key][savol].append({
+                    ANSWERS[
+                        global_key
+                    ][savol].append({
+
                         "text": javob,
+
                         "time": now,
+
                         "use_count": 0,
+
                         "max_uses": 2
                     })
 
@@ -4274,7 +5021,9 @@ def chat(message):
 
             if len(user_words) >= min_match:
 
-                if text_clean in ANSWERS["GLOBAL"]:
+                if text_clean in ANSWERS[
+                    "GLOBAL"
+                ]:
 
                     matched_question = (
                         text_clean
@@ -4282,7 +5031,9 @@ def chat(message):
 
                 else:
 
-                    for q in ANSWERS["GLOBAL"].keys():
+                    for q in ANSWERS[
+                        "GLOBAL"
+                    ].keys():
 
                         q_words = set(
                             re.findall(
@@ -4303,18 +5054,28 @@ def chat(message):
                         ):
 
                             matched_question = q
+
                             break
 
             if (
                 matched_question
-                and ANSWERS["GLOBAL"][
+                and ANSWERS[
+                    "GLOBAL"
+                ].get(
                     matched_question
-                ]
+                )
             ):
 
-                responses = ANSWERS["GLOBAL"][
-                    matched_question
-                ]
+                responses = (
+                    ANSWERS[
+                        "GLOBAL"
+                    ][
+                        matched_question
+                    ]
+                )
+
+                if not responses:
+                    return
 
                 chosen_item = random.choice(
                     responses
